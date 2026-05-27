@@ -27,15 +27,39 @@ PATTERNS_DIR = Path(__file__).parent / "patterns"
 # is itself a real "should be in typed settings" smell.
 COUNT_PER_FILE_THRESHOLDS: dict[str, int] = {
     "flunk.pydantic-settings": 3,
+    # secure-headers: each of the 4 header string literals fires one
+    # match; require ≥2 distinct mentions in the file before flagging
+    # so a one-off Referrer-Policy reference (e.g. in a comment-like
+    # test fixture) doesn't false-positive.
+    "flunk.secure-headers": 2,
+}
+
+# Paths-substring filters: rule fires only when the file path contains
+# any of these substrings (case-insensitive). Used for rules whose
+# signal depends on file context (e.g. bare-except is only worrying
+# in security/auth/crypto files, not throughout the codebase).
+PATH_SUBSTRING_FILTERS: dict[str, tuple[str, ...]] = {
+    "flunk.bare-except-security": ("security", "auth", "crypto", "csrf", "jwt", "token"),
 }
 
 
 def post_process(findings: list[Finding]) -> list[Finding]:
-    """Apply per-rule aggregation. Returns a new list."""
+    """Apply path-substring filters, then per-rule aggregation."""
+    # Path-substring filter pass: keep only findings in matching paths.
+    filtered: list[Finding] = []
+    for f in findings:
+        substrings = PATH_SUBSTRING_FILTERS.get(f.rule_id)
+        if substrings is None:
+            filtered.append(f)
+            continue
+        path_str = str(f.file).lower()
+        if any(s in path_str for s in substrings):
+            filtered.append(f)
+
     aggregated: dict[tuple[str, Path], list[Finding]] = defaultdict(list)
     passthrough: list[Finding] = []
 
-    for f in findings:
+    for f in filtered:
         if f.rule_id in COUNT_PER_FILE_THRESHOLDS:
             aggregated[(f.rule_id, f.file)].append(f)
         else:
@@ -46,7 +70,6 @@ def post_process(findings: list[Finding]) -> list[Finding]:
         threshold = COUNT_PER_FILE_THRESHOLDS[rule_id]
         if len(group) < threshold:
             continue
-        # Emit one finding at the first occurrence's line.
         first = min(group, key=lambda x: x.line)
         out.append(
             Finding(

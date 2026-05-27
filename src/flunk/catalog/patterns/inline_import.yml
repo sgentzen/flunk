@@ -1,0 +1,25 @@
+# Import statement inside a function body.
+#
+# Usually a band-aid for a circular-import cycle. Restructure the
+# modules so the cycle goes away. Sometimes legitimate for lazy
+# loading of an optional heavy dep — demote-justify when so.
+#
+# Expected fires: job-stalker, erate-filing-assistant
+rules:
+  - id: flunk.inline-import
+    languages: [python]
+    severity: INFO
+    message: >-
+      Import inside a function body — usually a circular-import band-aid.
+      Restructure the cycle (move shared types to a third module).
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              def $F(...):
+                  ...
+          - pattern-inside: |
+              async def $F(...):
+                  ...
+      - pattern-either:
+          - pattern: import $X
+          - pattern: from $X import $Y

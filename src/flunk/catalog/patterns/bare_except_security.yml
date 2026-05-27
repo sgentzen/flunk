@@ -1,0 +1,26 @@
+# `except Exception:` (or bare except) — full breadth.
+#
+# Post-process filters to security/auth/crypto file paths, where
+# swallowing an unknown exception is most dangerous (it can mask
+# signature-verification failures, key-derivation errors, etc).
+#
+# Expected fires: erate-filing-assistant (auth/security paths)
+rules:
+  - id: flunk.bare-except-security
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Bare `except` / `except Exception:` in a security-sensitive file
+      (auth/security/crypto). Catch the specific exception class so a
+      signature/cert/decryption failure isn't silently swallowed.
+    pattern-either:
+      - pattern: |
+          try:
+              ...
+          except Exception:
+              ...
+      - pattern: |
+          try:
+              ...
+          except:
+              ...

@@ -1,0 +1,21 @@
+# Hand-rolled "X ago" / "Xd ago" date formatter.
+#
+# `humanize.naturaltime()` does this in one call with locale support.
+# A custom formatter is rarely worth maintaining.
+#
+# Expected fires: job-stalker
+rules:
+  - id: flunk.humanize
+    languages: [python]
+    severity: INFO
+    message: >-
+      Hand-rolled relative-time formatter. Use `humanize.naturaltime()`
+      (https://python-humanize.readthedocs.io/) — covers seconds through
+      years with i18n.
+    pattern-either:
+      - pattern: f"{$X}d ago"
+      - pattern: f"{$X}h ago"
+      - pattern: f"{$X}m ago"
+      - pattern: f"{$X} days ago"
+      - pattern: f"{$X} hours ago"
+      - pattern: f"{$X} minutes ago"

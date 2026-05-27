@@ -1,0 +1,24 @@
+# f-string interpolation into query execution.
+#
+# Detects `$CONN.execute(f"...")` and the SoQL-style `params=f"..."`
+# pattern. Parameterize the query (bind values) instead — every DB
+# driver supports it, and it eliminates the entire injection class.
+#
+# Expected fires: erate-filing-assistant (SoQL)
+rules:
+  - id: flunk.sql-injection
+    languages: [python]
+    severity: ERROR
+    message: >-
+      f-string interpolation into a query execution. Use parameterized
+      queries (driver placeholders) — every driver supports it and it
+      eliminates the entire injection class.
+    pattern-either:
+      - pattern: $C.execute(f"...")
+      - pattern: $C.execute(f"...", ...)
+      - pattern: $C.executemany(f"...")
+      - pattern: $C.executescript(f"...")
+      - patterns:
+          - pattern-inside: |
+              $CLIENT.get(..., params=$P, ...)
+          - pattern: $P = f"..."

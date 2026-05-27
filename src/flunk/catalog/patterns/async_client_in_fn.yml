@@ -1,0 +1,26 @@
+# httpx client instantiated inside a function body.
+#
+# Each call constructs a fresh connection pool. Hoist to module level
+# or a class field so connections are reused. (FastAPI's recommended
+# pattern is a lifespan-managed singleton.)
+#
+# Expected fires: erate-filing-assistant
+rules:
+  - id: flunk.async-client-in-fn
+    languages: [python]
+    severity: WARNING
+    message: >-
+      httpx client instantiated inside a function body. Each call builds
+      a fresh connection pool. Hoist to a module-level / lifespan-managed
+      singleton so connections are reused.
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              def $F(...):
+                  ...
+          - pattern-inside: |
+              async def $F(...):
+                  ...
+      - pattern-either:
+          - pattern: httpx.AsyncClient(...)
+          - pattern: httpx.Client(...)

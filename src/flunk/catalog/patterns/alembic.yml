@@ -1,0 +1,29 @@
+# Hand-rolled schema-migration runner.
+#
+# Functions named `*_apply_*migration*` or `*_apply_inplace*` that
+# execute raw SQL (`ALTER TABLE`, `CREATE TABLE IF NOT EXISTS`) are
+# poor-man's Alembic.
+#
+# Expected fires: job-stalker
+rules:
+  - id: flunk.alembic
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Hand-rolled schema migrations. Use `Alembic`
+      (https://alembic.sqlalchemy.org/) for versioned migrations
+      with up/down semantics and a known head.
+    pattern-either:
+      - pattern: |
+          def _apply_inplace_migrations(...):
+              ...
+      - pattern: |
+          def apply_migrations(...):
+              ...
+      - pattern: |
+          def _apply_migrations(...):
+              ...
+      - pattern: |
+          def _migrate(...):
+              ...
+              $CONN.execute("ALTER TABLE ...")

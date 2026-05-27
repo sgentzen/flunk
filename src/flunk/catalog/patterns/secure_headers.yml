@@ -1,0 +1,22 @@
+# File contains custom security-header middleware.
+#
+# Matches files that set ≥2 of {X-Frame-Options, Content-Security-Policy,
+# Referrer-Policy}. The `secure` library bundles all of these with
+# audited defaults.
+#
+# Aggregated per-file (≥2 distinct header names) in catalog/__init__.py.
+#
+# Expected fires: erate-filing-assistant
+rules:
+  - id: flunk.secure-headers
+    languages: [python]
+    severity: INFO
+    message: >-
+      Custom security-header middleware. Use `secure`
+      (https://github.com/TypeError/secure) — audited defaults for
+      X-Frame-Options, CSP, Referrer-Policy, HSTS, and more.
+    pattern-either:
+      - pattern: '"X-Frame-Options"'
+      - pattern: '"Content-Security-Policy"'
+      - pattern: '"Referrer-Policy"'
+      - pattern: '"Strict-Transport-Security"'

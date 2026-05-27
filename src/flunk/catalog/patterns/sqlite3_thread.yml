@@ -1,0 +1,16 @@
+# Raw sqlite3 with check_same_thread=False.
+#
+# Sharing a sqlite3 connection across threads without coordination
+# is data-corruption-by-default. Use SQLAlchemy's pool or aiosqlite.
+#
+# Expected fires: erate-filing-assistant
+rules:
+  - id: flunk.sqlite3-thread
+    languages: [python]
+    severity: WARNING
+    message: >-
+      `sqlite3.connect(..., check_same_thread=False)` in what looks like
+      a web app. Use SQLAlchemy's connection pool or `aiosqlite` —
+      shared sqlite3 across threads without a pool is data corruption
+      by default.
+    pattern: sqlite3.connect(..., check_same_thread=False, ...)

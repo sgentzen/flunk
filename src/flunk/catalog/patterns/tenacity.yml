@@ -1,0 +1,30 @@
+# Hand-rolled retry loop: for ... range(N) with sleep inside.
+#
+# `tenacity` does retries with backoff, jitter, and predicate-based
+# stop conditions in two decorator lines. A hand-rolled `for attempt in
+# range(...)` loop is almost always a worse version of that.
+#
+# Expected fires: erate-filing-assistant
+rules:
+  - id: flunk.tenacity
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Hand-rolled retry loop with sleep. Use `tenacity`
+      (https://tenacity.readthedocs.io/) — decorator-based retries with
+      exponential backoff, jitter, and predicate stop conditions.
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  for $A in range(...):
+                      ...
+                      time.sleep(...)
+              - pattern: |
+                  for $A in range(...):
+                      ...
+                      await asyncio.sleep(...)
+          - pattern-not: |
+              for $A in range(1):
+                  ...
+                  time.sleep(...)
