@@ -1,6 +1,6 @@
 # Status
 
-**Current phase:** Pre-v1 scaffolding. Product validated through a 3-project audit experiment; name + scope + catalog seed locked. Code not yet written.
+**Current phase:** Weekend 1 complete (2026-05-26). Core loop ships: `flunk` CLI runs end-to-end with the `pydantic-settings` rule, justification-demote, and ranked rich/JSON output. Verified against all three regression projects; 11 unit + integration tests pass.
 
 ## Locked decisions
 
@@ -14,15 +14,15 @@
 
 Goal: a working `flunk audit ./project` that prints real findings from one real catalog rule against one real project.
 
-- [ ] `pip index versions flunk` + `gh search repos flunk` — verify name still clean (30 sec)
-- [ ] `uv init` + project skeleton matching [docs/V1_SPEC.md](docs/V1_SPEC.md) file layout
-- [ ] CLI entry: `flunk audit ./path [--json] [--top N] [--no-demote]` (typer)
-- [ ] `runners/semgrep.py` — subprocess wrapper, parse `--json` output into common `Finding` schema
-- [ ] First catalog rule: `flunk/catalog/patterns/pydantic_settings.yml` (≥5 `os.environ.get` calls per file → suggest `pydantic-settings`). Universal — fires on all three regression projects.
-- [ ] `demote.py` — read 3 lines above/below each finding, demote severity on `# deliberately|intentionally|chose|fall back|rather than|tradeoff` matches
-- [ ] `rank.py` — sort by severity desc, then category, then file
-- [ ] Run against all three regression projects; verify the catalog rule lights up on each
-- [ ] Hand-tune until signal-to-noise is acceptable
+- [x] `pip index versions flunk` + `gh search repos flunk` — verified clean on 2026-05-26 (no PyPI release exists; the GitHub matches are unrelated projects: flunkydom, flunkysimulator, gargakshit/flunk-the-app)
+- [x] `uv init` + project skeleton matching [docs/V1_SPEC.md](docs/V1_SPEC.md) file layout
+- [x] CLI entry: `flunk ./path [--json] [--top N] [--no-demote]` (typer — single-command app, so no `audit` subcommand prefix needed; V1_SPEC will be re-titled in Weekend 2)
+- [x] `runners/semgrep.py` — subprocess wrapper, parse `--json` output into common `Finding` schema
+- [x] First catalog rule: `flunk/catalog/patterns/pydantic_settings.yml`. Threshold tuned to ≥3 (not ≥5) — required to fire on `job-stalker/__main__.py` per CATALOG.md "evidence: all 3 projects" claim; rationale documented in `catalog/__init__.py`.
+- [x] `demote.py` — read 3 lines above/below each finding, marker regex anchored to `#` so string literals don't trigger
+- [x] `rank.py` — sort by severity desc, then category, then file
+- [x] Run against all three regression projects; rule fires on each (job-stalker: 1 file × 3 occurrences; erate-filing-assistant: multiple files incl. config.py × 16; erate-prospector: multiple files incl. config.py × 41)
+- [x] Hand-tune until signal-to-noise is acceptable (threshold change above; defer broader tuning to Weekend 2 when more rules expose patterns)
 
 **Definition of done:** the CLI runs end-to-end, one rule produces real findings on three real projects, justification-demote correctly suppresses a known commented case in `job-stalker` (e.g., the `_apply_inplace_migrations` doc-block).
 

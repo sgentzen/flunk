@@ -7,6 +7,10 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from flunk import demote as demote_mod
+from flunk import rank as rank_mod
+from flunk.runners import semgrep as semgrep_runner
+
 app = typer.Typer(
     no_args_is_help=True,
     help="A BS detector for AI-built Python code.",
@@ -42,16 +46,22 @@ def audit(
         help="Disable the justification-aware demote pass.",
     ),
 ) -> None:
-    """Audit a Python project for AI cut-corners.
+    """Audit a Python project for AI cut-corners."""
+    try:
+        findings = semgrep_runner.run(project)
+    except semgrep_runner.SemgrepNotFound as e:
+        console.print(f"[bold red]error:[/bold red] {e}")
+        raise typer.Exit(code=2)
+    except RuntimeError as e:
+        console.print(f"[bold red]semgrep failed:[/bold red] {e}")
+        raise typer.Exit(code=1)
 
-    Wraps semgrep + jscpd, layers a curated catalog of reinvented-wheel
-    patterns on top, demotes findings near justification comments, then
-    prints a ranked report.
-    """
-    console.print(f"[bold]flunk[/bold] auditing [cyan]{project}[/cyan]")
-    console.print(f"  --json      {json_out}")
-    console.print(f"  --top       {top}")
-    console.print(f"  --no-demote {no_demote}")
-    console.print()
-    console.print("[yellow]Pipeline not yet implemented — this is a wiring stub.[/yellow]")
-    console.print("[dim]Next: src/flunk/findings.py + src/flunk/runners/semgrep.py[/dim]")
+    if not no_demote:
+        findings = demote_mod.demote(findings)
+
+    findings = rank_mod.rank(findings)
+
+    if json_out:
+        rank_mod.render_json(findings)
+    else:
+        rank_mod.render_table(findings, top=top, console=console)

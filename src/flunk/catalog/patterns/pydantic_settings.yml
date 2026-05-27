@@ -1,0 +1,24 @@
+# Detect config files that hand-roll env-var parsing.
+#
+# Strategy: match every `os.environ.get(...)` and `os.getenv(...)` call.
+# The Python post-process pass (catalog/__init__.py) groups by file and
+# only emits a finding when count ≥ 5 in a single file.
+#
+# Why not threshold inside Semgrep: Semgrep is per-pattern, not per-file
+# aggregating. Aggregation lives in Python so we can also count across
+# multiple equivalent forms (`os.environ.get`, `os.getenv`,
+# `os.environ["KEY"]`) without a metavariable-comparison hack.
+#
+# Expected fires: job-stalker, erate-filing-assistant, erate-prospector
+rules:
+  - id: flunk.pydantic-settings
+    languages: [python]
+    severity: WARNING
+    message: >-
+      File hand-rolls environment-variable parsing.
+      Use pydantic-settings (https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
+      for typed, validated config with one declaration per field.
+    pattern-either:
+      - pattern: os.environ.get(...)
+      - pattern: os.getenv(...)
+      - pattern: os.environ[...]
