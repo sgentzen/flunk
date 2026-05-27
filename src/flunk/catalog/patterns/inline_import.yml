@@ -4,6 +4,11 @@
 # modules so the cycle goes away. Sometimes legitimate for lazy
 # loading of an optional heavy dep — demote-justify when so.
 #
+# Excludes TYPE_CHECKING-guarded imports (PEP 484 idiom, not a smell).
+# Aggregated per-file with threshold ≥5 in catalog/__init__.py — a file
+# with one or two inline imports is usually intentional lazy loading;
+# five-plus suggests a real architectural cycle.
+#
 # Expected fires: job-stalker, erate-filing-assistant
 rules:
   - id: flunk.inline-import
@@ -23,3 +28,19 @@ rules:
       - pattern-either:
           - pattern: import $X
           - pattern: from $X import $Y
+      - pattern-not-inside: |
+          if TYPE_CHECKING:
+              ...
+      - pattern-not-inside: |
+          if typing.TYPE_CHECKING:
+              ...
+      - pattern-not-inside: |
+          try:
+              ...
+          except ImportError:
+              ...
+      - pattern-not-inside: |
+          try:
+              ...
+          except ModuleNotFoundError:
+              ...

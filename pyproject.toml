@@ -1,7 +1,7 @@
 [project]
 name = "flunk"
 version = "0.1.0"
-description = "Add your description here"
+description = "A BS detector for AI-built Python code — audits for reinvented OSS libraries, hand-rolled retries, structural duplication, and other AI-cut-corner patterns."
 readme = "README.md"
 authors = [
     { name = "Scott Gentzen", email = "gentzen@gmail.com" }
