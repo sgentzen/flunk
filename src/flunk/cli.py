@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
+from flunk import agent as agent_mod
 from flunk import demote as demote_mod
 from flunk import detectors as detectors_mod
 from flunk import rank as rank_mod
@@ -37,6 +39,11 @@ def audit(
         False,
         "--json",
         help="Emit findings as JSON instead of a rich table.",
+    ),
+    agent_out: bool = typer.Option(
+        False,
+        "--agent",
+        help="Emit an agent-actionable markdown fix plan grouped by rule.",
     ),
     top: int = typer.Option(
         25,
@@ -77,7 +84,12 @@ def audit(
         status.update("[bold]Ranking findings…")
         findings = rank_mod.rank(findings)
 
-    if json_out:
+    if agent_out:
+        # The plan is UTF-8 markdown (emoji, arrows); Windows' default cp1252
+        # stdout can't encode it, so emit UTF-8 explicitly.
+        plan = agent_mod.build_plan(findings, project_root=project)
+        sys.stdout.buffer.write(plan.encode("utf-8"))
+    elif json_out:
         rank_mod.render_json(findings)
     else:
         rank_mod.render_table(findings, top=top, console=console)
