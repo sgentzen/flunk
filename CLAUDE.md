@@ -28,6 +28,7 @@ No web framework, no DB, no async. This is a CLI tool — keep it simple.
 - Rule metadata (severity, replacement library, why) lives in `flunk/catalog/metadata.py`
 - Every catalog rule must include a `# Expected fires:` comment listing which regression projects it should match — used by tests to detect regressions
 - No new top-level dependencies without checking they're justified — we're the BS detector; don't be the BS
+- The opt-in `--judge` LLM pass lives in `src/flunk/judge.py` (client-agnostic core: per-file batching, severity re-rating, code-specific rationale) + `src/flunk/judge_anthropic.py` (the Anthropic-backed client, behind the `flunk[judge]` optional extra). Security rules in `metadata.SECURITY_RULES` can be escalated but never downgraded or skipped by the judge.
 
 ## Regression suite
 
