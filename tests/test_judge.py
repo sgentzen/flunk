@@ -93,3 +93,23 @@ def test_batches_one_call_per_file(tmp_path) -> None:
     })
     judge_findings([fa1, fa2, fb], client=client, project_root=tmp_path)
     assert sorted(client.calls) == ["a.py", "b.py"]
+
+
+def test_one_file_failing_does_not_sink_other_files(tmp_path) -> None:
+    (tmp_path / "ok.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "bad.py").write_text("y = 2\n", encoding="utf-8")
+    ok = _f("flunk.humanize", "nitpick", 1, category="oss-catalog", file=str(tmp_path / "ok.py"))
+    bad = _f("flunk.humanize", "nitpick", 1, category="oss-catalog", file=str(tmp_path / "bad.py"))
+
+    class FlakyClient:
+        def judge_file(self, rel_path, items):
+            if rel_path == "bad.py":
+                raise RuntimeError("LLM timeout")
+            return [Verdict("medium", "real reasoning", True) for _ in items]
+
+    out = judge_findings([ok, bad], client=FlakyClient(), project_root=tmp_path)
+    by_file = {f.file.name: f for f in out}
+    assert by_file["ok.py"].judged is True
+    assert by_file["ok.py"].severity == "medium"
+    assert by_file["bad.py"].judged is False      # unjudged, original severity kept
+    assert by_file["bad.py"].severity == "nitpick"

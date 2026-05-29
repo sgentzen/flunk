@@ -43,7 +43,10 @@ class Verdict:
 
 
 class JudgeClient(Protocol):
-    def judge_file(self, rel_path: str, items: list[JudgeItem]) -> list[Verdict]: ...
+    def judge_file(self, rel_path: str, items: list[JudgeItem]) -> list[Verdict]:
+        """Return exactly one Verdict per item, in order. Raising or returning a
+        mismatched count leaves that file's findings unjudged (see judge_findings)."""
+        ...
 
 
 def _excerpt(file: Path, line: int, context: int = CONTEXT_LINES) -> str:
@@ -74,7 +77,8 @@ def _clamp_security(verdict: Verdict, catalog_severity: str) -> Verdict:
 
     Lower severity = higher SEVERITY_ORDER int. If the judge's severity is
     *less* severe than the catalog's (a higher int) or a `skip`, revert to the
-    catalog severity. A raise (lower int) is allowed through.
+    catalog severity. A raise (lower int) is allowed through. An unknown
+    severity (`.get(sev, 99)` fallback) also reverts to the catalog severity.
     """
     sev = verdict.severity
     if sev == "skip" or SEVERITY_ORDER.get(sev, 99) > SEVERITY_ORDER[catalog_severity]:
@@ -109,14 +113,25 @@ def judge_findings(
             )
             for f in group
         ]
-        verdicts = client.judge_file(_rel(file, project_root), items)
-        for f, verdict in zip(group, verdicts, strict=True):
-            sev = verdict.severity if verdict.severity in _JUDGE_SEVERITIES else f.severity
-            v = Verdict(sev, verdict.rationale, verdict.worth_doing)
-            if metadata.is_security_rule(f.rule_id):
-                v = _clamp_security(v, f.severity)
-            enriched[id(f)] = f.with_judgment(
-                severity=v.severity, rationale=v.rationale, worth_doing=v.worth_doing
-            )
+        try:
+            verdicts = client.judge_file(_rel(file, project_root), items)
+            judged = []
+            for f, verdict in zip(group, verdicts, strict=True):
+                sev = verdict.severity if verdict.severity in _JUDGE_SEVERITIES else f.severity
+                v = Verdict(sev, verdict.rationale, verdict.worth_doing)
+                if metadata.is_security_rule(f.rule_id):
+                    v = _clamp_security(v, f.severity)
+                judged.append((f, f.with_judgment(
+                    severity=v.severity, rationale=v.rationale, worth_doing=v.worth_doing
+                )))
+        except Exception:
+            # One file failing (LLM error, malformed/mismatched response) must not
+            # sink the whole pass — leave this file's findings unjudged and move on.
+            continue
+        # Apply only after the whole file succeeds, so a mid-file exception
+        # leaves no partial enrichment for this file (all-or-nothing per file).
+        for f, jf in judged:
+            enriched[id(f)] = jf
 
+    # Keyed by object identity: callers must not pass the same Finding twice.
     return [enriched.get(id(f)) or passthrough.get(id(f)) or f for f in findings]
