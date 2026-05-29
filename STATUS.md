@@ -56,6 +56,15 @@ Driven by agent feedback on a real `job-stalker` scan that was ~2-of-7-rules act
 
 Known follow-up (spawned as a separate task): the jscpd runner's npx fallback couldn't launch on Windows (`.CMD` shim); fixed in-tree via `resolve_cmd_prefix` (`cmd /c` wrap). jscpd 4.x report-path output still worth confirming.
 
+## Eval-driven static fixes (2026-05-29)
+
+Driven by an external eval of a job-stalker scan ("locates well, judges poorly"):
+- **async-client severity is context-aware** ([async_client_severity.py](src/flunk/detectors/async_client_severity.py)): HIGH only when the client is built inside a loop (incl. comprehensions); one-shot constructions are MEDIUM with a "pooling only helps under repeated calls" message.
+- **pydantic-settings ignores presence checks** ([env_read_filter.py](src/flunk/catalog/env_read_filter.py)): `if not os.environ.get(...)` branch guards are no longer counted as config reads. job-stalker dropped from the rule's expected-fires (its 3 hits were all presence checks).
+- **jscpd noise cut**: min-tokens 50 → 70 and clone pairs < 6 lines dropped (`MIN_DUP_LINES`).
+
+Known follow-up (flagged during implementation): the jscpd runner's `NON_SOURCE_GLOBS` doesn't exclude `.venv`/`site-packages`/`node_modules`/`.worktrees`, so it scans vendored deps — a separate fix.
+
 ## v1.5+ backlog (do not start before v1 ships)
 
 - **Pre-flight mode** — hook into Claude Code / Cursor planning output, flag the cut-corner before code is written. Highest-value v2 feature per the codebase-maturity insight in [docs/PRODUCT.md](docs/PRODUCT.md).
