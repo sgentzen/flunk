@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 
 from flunk.catalog.metadata import lookup
-from flunk.detectors._walk import walk_py
+from flunk.detectors._walk import parse_py, walk_py
 from flunk.findings import Finding
 
 RULE_ID = "flunk.module-singleton"
@@ -72,9 +72,8 @@ def run(project: Path) -> list[Finding]:
             continue
         if _LOCK_RE.search(text):
             continue
-        try:
-            tree = ast.parse(text)
-        except SyntaxError:
+        tree = parse_py(path, text)
+        if tree is None:
             continue
         for lineno, name in _module_level_optional_singletons(tree):
             out.append(

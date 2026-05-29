@@ -14,7 +14,7 @@ import ast
 from pathlib import Path
 
 from flunk.catalog.metadata import lookup
-from flunk.detectors._walk import walk_py
+from flunk.detectors._walk import parse_py, walk_py
 from flunk.findings import Finding
 
 RULE_ID = "flunk.duplicate-retry"
@@ -23,9 +23,8 @@ RULE_ID = "flunk.duplicate-retry"
 def run(project: Path) -> list[Finding]:
     retry_defs: list[tuple[Path, int, str]] = []
     for path in walk_py(project):
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
-        except (OSError, SyntaxError):
+        tree = parse_py(path)
+        if tree is None:
             continue
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
