@@ -109,7 +109,7 @@ def judge_findings(
             )
             for f in group
         ]
-        verdicts = client.judge_file(str(file), items)
+        verdicts = client.judge_file(_rel(file, project_root), items)
         for f, verdict in zip(group, verdicts, strict=True):
             sev = verdict.severity if verdict.severity in _JUDGE_SEVERITIES else f.severity
             v = Verdict(sev, verdict.rationale, verdict.worth_doing)

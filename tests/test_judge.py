@@ -31,7 +31,7 @@ def test_rewrites_rationale_and_reraters_severity(tmp_path) -> None:
     f = _f("flunk.async-client-in-fn", "high", 3, file=str(tmp_path / "a.py"))
     (tmp_path / "a.py").write_text("# x\n# y\nhttpx.AsyncClient()\n", encoding="utf-8")
     client = FakeClient({
-        (str(f.file), 3): Verdict(severity="medium", rationale="one-shot HEAD; pooling moot", worth_doing=True),
+        ("a.py", 3): Verdict(severity="medium", rationale="one-shot HEAD; pooling moot", worth_doing=True),
     })
     out = judge_findings([f], client=client, project_root=tmp_path)
     assert out[0].severity == "medium"
@@ -43,7 +43,7 @@ def test_skip_verdict_sets_skip_severity(tmp_path) -> None:
     f = _f("flunk.duplication", "medium", 1, category="duplication", file=str(tmp_path / "d.py"))
     (tmp_path / "d.py").write_text("x = 1\n", encoding="utf-8")
     client = FakeClient({
-        (str(f.file), 1): Verdict(severity="skip", rationale="unrelated functions, not real dup", worth_doing=False),
+        ("d.py", 1): Verdict(severity="skip", rationale="unrelated functions, not real dup", worth_doing=False),
     })
     out = judge_findings([f], client=client, project_root=tmp_path)
     assert out[0].severity == "skip"
@@ -54,7 +54,7 @@ def test_security_rule_cannot_be_downgraded(tmp_path) -> None:
     f = _f("flunk.sql-injection", "high", 1, file=str(tmp_path / "s.py"))
     (tmp_path / "s.py").write_text("q = f'... {x}'\n", encoding="utf-8")
     client = FakeClient({
-        (str(f.file), 1): Verdict(severity="nitpick", rationale="looks fine to me", worth_doing=False),
+        ("s.py", 1): Verdict(severity="nitpick", rationale="looks fine to me", worth_doing=False),
     })
     out = judge_findings([f], client=client, project_root=tmp_path)
     assert out[0].severity == "high"
@@ -66,7 +66,7 @@ def test_security_rule_can_be_raised(tmp_path) -> None:
     f = _f("flunk.bare-except-security", "medium", 1, file=str(tmp_path / "s.py"))
     (tmp_path / "s.py").write_text("try:\n    pass\nexcept: pass\n", encoding="utf-8")
     client = FakeClient({
-        (str(f.file), 1): Verdict(severity="high", rationale="swallows auth failure", worth_doing=True),
+        ("s.py", 1): Verdict(severity="high", rationale="swallows auth failure", worth_doing=True),
     })
     out = judge_findings([f], client=client, project_root=tmp_path)
     assert out[0].severity == "high"
@@ -87,9 +87,9 @@ def test_batches_one_call_per_file(tmp_path) -> None:
     fa2 = _f("flunk.humanize", "nitpick", 2, category="oss-catalog", file=str(tmp_path / "a.py"))
     fb = _f("flunk.humanize", "nitpick", 1, category="oss-catalog", file=str(tmp_path / "b.py"))
     client = FakeClient({
-        (str(fa1.file), 1): Verdict("nitpick", "r", True),
-        (str(fa1.file), 2): Verdict("nitpick", "r", True),
-        (str(fb.file), 1): Verdict("nitpick", "r", True),
+        ("a.py", 1): Verdict("nitpick", "r", True),
+        ("a.py", 2): Verdict("nitpick", "r", True),
+        ("b.py", 1): Verdict("nitpick", "r", True),
     })
     judge_findings([fa1, fa2, fb], client=client, project_root=tmp_path)
-    assert sorted(client.calls) == sorted({str(fa1.file), str(fb.file)})
+    assert sorted(client.calls) == ["a.py", "b.py"]
