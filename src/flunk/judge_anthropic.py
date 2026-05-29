@@ -84,23 +84,29 @@ def _parse_tool_input(tool_input: dict[str, Any], items: list[JudgeItem]) -> lis
 class AnthropicJudgeClient:
     def __init__(self, *, model: str, sdk: Any | None = None) -> None:
         self.model = model
-        self._sdk = sdk
+        # Injected sdk (tests) is used as-is. Otherwise resolve the real SDK now,
+        # so a missing `flunk[judge]` extra (or an un-initializable client, e.g. no
+        # ANTHROPIC_API_KEY) fails fast HERE — where the CLI reports it cleanly —
+        # rather than later inside judge_findings' per-file error handling, which
+        # would silently swallow it and leave everything unjudged.
+        self._sdk = sdk if sdk is not None else self._new_sdk()
 
-    def _client(self) -> Any:
-        if self._sdk is not None:
-            return self._sdk
+    @staticmethod
+    def _new_sdk() -> Any:
         try:
             import anthropic
-        except ImportError as e:  # pragma: no cover
+        except ImportError as e:
             raise RuntimeError(
                 "--judge needs the anthropic SDK. Install it with: "
                 "pip install 'flunk[judge]'"
             ) from e
-        self._sdk = anthropic.Anthropic()
-        return self._sdk
+        try:
+            return anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+        except Exception as e:
+            raise RuntimeError(f"could not initialize the Anthropic client: {e}") from e
 
     def judge_file(self, rel_path: str, items: list[JudgeItem]) -> list[Verdict]:
-        resp = self._client().messages.create(
+        resp = self._sdk.messages.create(
             model=self.model,
             max_tokens=1024,
             system=_SYSTEM,

@@ -61,3 +61,20 @@ def test_judge_file_calls_model_and_parses() -> None:
     assert verdicts[0].rationale == "one-shot"
     assert sdk.messages.kwargs["model"] == "claude-sonnet-4-6"
     assert sdk.messages.kwargs["tool_choice"]["type"] == "tool"
+
+
+def test_missing_sdk_raises_at_construction(monkeypatch):
+    import builtins
+    from flunk.judge_anthropic import AnthropicJudgeClient
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "anthropic":
+            raise ImportError("no anthropic")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    import pytest
+    with pytest.raises(RuntimeError, match=r"flunk\[judge\]"):
+        AnthropicJudgeClient(model="claude-sonnet-4-6")
