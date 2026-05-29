@@ -48,3 +48,23 @@ def test_skip_severity_has_style_and_sorts_last():
     assert ranked[0].severity == "high"
     assert ranked[-1].severity == "skip"
     rank_mod.render_table(ranked, top=10, console=Console())
+
+
+def test_render_table_escapes_markup_in_rationale():
+    import io
+    from pathlib import Path
+    from rich.console import Console
+    from flunk.findings import Finding
+    from flunk import rank as rank_mod
+
+    f = Finding(
+        "flunk.async-client-in-fn", "anti-pattern", "skip", Path("a.py"), 1, "msg",
+        rationale="use list[int] not List[int]; stray close [/notopen]", judged=True,
+    )
+    buf = io.StringIO()
+    console = Console(file=buf, width=240, no_color=True)
+    # Must not raise MarkupError, and must not swallow the bracketed text.
+    rank_mod.render_table(rank_mod.rank([f]), top=10, console=console)
+    out = buf.getvalue()
+    assert "list[int]" in out
+    assert "[/notopen]" in out
