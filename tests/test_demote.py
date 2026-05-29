@@ -62,6 +62,32 @@ def test_nitpick_demotes_to_suppressed(tmp_path: Path) -> None:
     assert out == []  # suppressed entirely
 
 
+def test_module_docstring_justification_demotes(tmp_path: Path) -> None:
+    """A project-level justification in the module docstring demotes findings
+    anywhere in that file, not just within +-3 lines."""
+    src = tmp_path / "f.py"
+    body = '"""This module deliberately rolls its own X for reason Y."""\n'
+    body += "import os\n"
+    body += "filler = 1\n" * 20  # push the finding well outside the +-3 window
+    body += "z = os.environ.get('K')\n"
+    src.write_text(body)
+    finding_line = body.count("\n")  # last line
+    out = demote([_mk(src, finding_line)])
+    assert out[0].severity == "medium"
+    assert out[0].demoted_by is not None
+
+
+def test_no_docstring_justification_no_demote(tmp_path: Path) -> None:
+    src = tmp_path / "g.py"
+    body = '"""An ordinary module docstring with no justification."""\n'
+    body += "filler = 1\n" * 20
+    body += "z = os.environ.get('K')\n"
+    src.write_text(body)
+    out = demote([_mk(src, body.count("\n"))])
+    assert out[0].severity == "high"
+    assert out[0].demoted_by is None
+
+
 def test_marker_in_string_literal_doesnt_match(tmp_path: Path) -> None:
     """Markers anchor to `#` so they don't fire on string literals."""
     src = tmp_path / "e.py"

@@ -32,13 +32,10 @@ COUNT_PER_FILE_THRESHOLDS: dict[str, int] = {
     # so a one-off Referrer-Policy reference (e.g. in a comment-like
     # test fixture) doesn't false-positive.
     "flunk.secure-headers": 2,
-    # inline-import: one or two inline imports is almost always lazy
-    # loading of a heavy/optional dep. Three-plus in a single file
-    # is where it tips into "real circular-import problem" territory.
-    # Tuned from a 437-hit explosion on erate-prospector to a handful
-    # of actionable per-file findings; threshold 3 keeps the rule
-    # firing on erate-filing-assistant per CATALOG.md evidence.
-    "flunk.inline-import": 3,
+    # inline-import moved to an AST detector (detectors/inline_import.py),
+    # which can see the imported module name and so count only first-party
+    # imports — semgrep can't, which is why it lived here as a blunt
+    # count-threshold before. Aggregation now happens in the detector.
 }
 
 # Paths-substring filters: rule fires only when the file path contains

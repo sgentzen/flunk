@@ -1,11 +1,13 @@
 """Rule #7: Two `*retry*` function definitions in the same project with
 structurally similar shape. Extract shared retry / use tenacity.
 
-Approach: AST-walk every .py file in the project (skip venv / build /
-worktrees), collect functions whose name contains 'retry', emit a
-finding if there are ≥2.
+Approach: AST-walk every *source* .py file in the project (walk_py skips
+venv / build / tests / migrations), collect functions whose name contains
+'retry', emit a finding if there are ≥2.
 
-Expected fires: erate-filing-assistant
+Expected fires: none of the 3 golden projects (each has exactly one source
+retry function). Behavior is covered by tests/test_duplicate_retry.py — the
+test-file exclusion guards against the pytest `test_retry_*` false positive.
 """
 
 from __future__ import annotations
