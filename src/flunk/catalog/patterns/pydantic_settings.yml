@@ -9,7 +9,9 @@
 # multiple equivalent forms (`os.environ.get`, `os.getenv`,
 # `os.environ["KEY"]`) without a metavariable-comparison hack.
 #
-# Expected fires: job-stalker, erate-filing-assistant, erate-prospector
+# Expected fires: erate-filing-assistant, erate-prospector
+# (job-stalker excluded 2026-05-29 — its os.environ hits are presence-check
+#  branches, not config reads; see catalog/env_read_filter.py)
 rules:
   - id: flunk.pydantic-settings
     languages: [python]

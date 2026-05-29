@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
+from flunk.catalog.env_read_filter import drop_presence_checks
 from flunk.detectors import async_client_severity
 from flunk.findings import Finding
 
@@ -60,6 +61,8 @@ def post_process(findings: list[Finding]) -> list[Finding]:
         path_str = str(f.file).lower()
         if any(s in path_str for s in substrings):
             filtered.append(f)
+
+    filtered = drop_presence_checks(filtered)
 
     aggregated: dict[tuple[str, Path], list[Finding]] = defaultdict(list)
     passthrough: list[Finding] = []

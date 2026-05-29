@@ -19,7 +19,11 @@ from flunk.runners import semgrep as semgrep_runner
 
 # rule_id -> tuple of conftest fixture names that should produce ≥1 hit
 EXPECTED_FIRES: dict[str, tuple[str, ...]] = {
-    "flunk.pydantic-settings":      ("job_stalker", "erate_filing_assistant", "erate_prospector"),
+    # job-stalker dropped 2026-05-29: its only hits were 3 presence-check
+    # guards (`if not os.environ.get("ANTHROPIC_API_KEY")`) in __main__.py —
+    # a branch with a working fallback, not a config read. env_read_filter
+    # now excludes presence checks, so the count falls below the threshold.
+    "flunk.pydantic-settings":      ("erate_filing_assistant", "erate_prospector"),
     "flunk.tenacity":               ("erate_filing_assistant",),
     "flunk.uv-pip-compile":         ("erate_filing_assistant", "erate_prospector"),
     "flunk.alembic":                ("job_stalker",),
