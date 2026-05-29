@@ -38,7 +38,21 @@ def test_build_cmd_passes_project_as_posix_path() -> None:
     )
     project_arg = cmd[-1]
     assert "\\" not in project_arg
-    assert project_arg == Path("/proj/sub").as_posix()
+
+
+def test_build_cmd_resolves_project_to_absolute_path() -> None:
+    # jscpd's default gitignore-based exclusion of vendored dirs (.venv,
+    # .worktrees, node_modules) only fires when handed an ABSOLUTE path. A
+    # relative '../proj' defeats it, so jscpd scans the whole vendored tree
+    # and reports thousands of third-party false-positive duplicates. Resolve
+    # the project path so the relative prefix can't disable the exclusion.
+    cmd = build_jscpd_cmd(
+        ["jscpd"], Path("../sibling"), Path("/out"), min_tokens=50
+    )
+    project_arg = cmd[-1]
+    assert ".." not in project_arg
+    assert Path(project_arg).is_absolute()
+    assert project_arg == Path("../sibling").resolve().as_posix()
 
 
 def test_resolve_prefix_wraps_windows_cmd_shim(monkeypatch) -> None:

@@ -63,12 +63,30 @@ Driven by an external eval of a job-stalker scan ("locates well, judges poorly")
 - **pydantic-settings ignores presence checks** ([env_read_filter.py](src/flunk/catalog/env_read_filter.py)): `if not os.environ.get(...)` branch guards are no longer counted as config reads. job-stalker dropped from the rule's expected-fires (its 3 hits were all presence checks).
 - **jscpd noise cut**: min-tokens 50 → 70 and clone pairs < 6 lines dropped (`MIN_DUP_LINES`).
 
-Known follow-up (flagged during implementation): the jscpd runner's `NON_SOURCE_GLOBS` doesn't exclude `.venv`/`site-packages`/`node_modules`/`.worktrees`, so it scans vendored deps — a separate fix.
+Known follow-up (flagged during implementation): the jscpd runner's `NON_SOURCE_GLOBS` doesn't exclude `.venv`/`site-packages`/`node_modules`/`.worktrees`, so it scans vendored deps — a separate fix. **Fixed 2026-05-29, see below.**
+
+## jscpd vendored-deps false positives (2026-05-29)
+
+Symptom: a jscpd run on `job-stalker` reported **3178** duplicates, almost all from `.venv/Lib/site-packages/...` and `.worktrees/.../.venv/...` vendored third-party code (the eval expected ~10).
+
+Diagnosis was empirical, not assumed. Two changes, both TDD'd:
+- **Real root cause — relative scan path defeated jscpd's exclusion** ([runners/jscpd.py](src/flunk/runners/jscpd.py)): jscpd only excludes vendored/build dirs (`.venv`, `.worktrees`, `node_modules`, ...) when handed an **absolute** path. The runner passed `project.as_posix()` (e.g. `../job-stalker`), and the `..` prefix silently disabled that exclusion — so jscpd walked the whole vendored tree. Measured directly: absolute path → 29 raw clone pairs, relative `../` path → 3178, *with `--ignore` having zero effect in either mode*. Fix: `project.resolve().as_posix()`. job-stalker findings: **3178 → 6** (29 raw pairs, `MIN_DUP_LINES` filters to 6).
+- **Defense-in-depth — vendor globs in `NON_SOURCE_GLOBS`** ([classify.py](src/flunk/classify.py)): added `**/<dir>/**` for each of a new shared `VENDOR_DIRS` frozenset (`.venv`, `venv`, `node_modules`, `site-packages`, `.worktrees`, `build`, `dist`, `__pycache__`, `.tox`, `.git`). `detectors/_walk.py`'s `SKIP_DIRS` now derives from `VENDOR_DIRS` (+ `.claude`) so the AST-walk and jscpd scan paths can't drift (`site-packages` is newly added to the AST-walk skip set as part of this share). Note: these globs don't actually fire today (jscpd's `--ignore` was inert in the measurements above) — they're documented intent plus protection for any vendored dir that isn't git-ignored.
+
+## Opt-in LLM judge pass (2026-05-29, PR #5)
+
+Plan 2 of the hybrid judgment work (design + plans under `docs/superpowers/`). `flunk <path> --judge` sends located findings + code context to Claude, which re-rates severity for the call site, rewrites the rationale to be code-specific, and may mark a finding `skip` ("located but not worth doing", kept in output with its reason).
+
+- Core: [judge.py](src/flunk/judge.py) — client-agnostic, per-file batching, per-file degrade-safety (one bad file never sinks the pass), original order preserved, security clamp.
+- Client: [judge_anthropic.py](src/flunk/judge_anthropic.py) — `AnthropicJudgeClient` behind the `flunk[judge]` optional extra; eager SDK resolution so a missing extra fails fast (CLI exit 2).
+- Guardrail: `metadata.SECURITY_RULES` (sql-injection, csrf, f811, bare-except) can be escalated but never downgraded/skipped.
+- Default off; the static pipeline is unchanged and imports no `anthropic`. CLI: `--judge` / `--judge-model` (default `claude-sonnet-4-6`).
+- Open decision: the justification-demote pass runs before the judge, so a `SECURITY_RULES` finding can be demoted (by a human "deliberately…" comment) below catalog before the judge's clamp floor sees it. `raw_severity` provenance is preserved; deciding whether to exempt security rules from demote is a follow-up.
 
 ## v1.5+ backlog (do not start before v1 ships)
 
 - **Pre-flight mode** — hook into Claude Code / Cursor planning output, flag the cut-corner before code is written. Highest-value v2 feature per the codebase-maturity insight in [docs/PRODUCT.md](docs/PRODUCT.md).
-- **LLM judgment layer** — send HYBRID-category findings to Claude for a "is this actually a smell?" pass. Add only once the catalog has demonstrated trust.
+- ~~**LLM judgment layer** — send HYBRID-category findings to Claude for a "is this actually a smell?" pass. Add only once the catalog has demonstrated trust.~~ **SHIPPED 2026-05-29** as the opt-in `--judge` pass (see "Opt-in LLM judge pass" above); the eval that validated the trust gate is the job-stalker scan that drove the static fixes.
 - **Cross-project mode** — ingest a portfolio of repos, surface deduplication candidates. The user already has 2 confirmed cases of cross-project porting (`usac_data` lib, `erate-assistant` sibling) — pain is real.
 - **Spec-conformance** — diff shipped code against a planning document, flag drift. Not validated in the audit experiment; do that audit pass first.
 - **Visual map** — spatial UI for navigating findings. Original product framing, deprioritized after findings became the value. Revisit only if findings prove they need spatial context.

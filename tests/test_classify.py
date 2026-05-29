@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from flunk.classify import FileKind, classify, is_source
+from flunk.classify import NON_SOURCE_GLOBS, VENDOR_DIRS, FileKind, classify, is_source
 
 
 @pytest.mark.parametrize(
@@ -46,3 +46,26 @@ def test_is_source_true_only_for_source() -> None:
     assert is_source(Path("tests/test_handler.py")) is False
     assert is_source(Path("templates/x.html")) is False
     assert is_source(Path("migrations/0001.py")) is False
+
+
+@pytest.mark.parametrize(
+    "vendor_dir",
+    [
+        ".venv", "venv", "node_modules", "site-packages", ".worktrees",
+        "build", "dist", "__pycache__", ".tox", ".git",
+    ],
+)
+def test_non_source_globs_exclude_vendor_dirs(vendor_dir: str) -> None:
+    # jscpd must never scan vendored/build dirs (e.g. .venv/Lib/site-packages),
+    # or it reports thousands of false-positive duplicates from third-party code.
+    assert f"**/{vendor_dir}/**" in NON_SOURCE_GLOBS
+
+
+def test_walk_skip_dirs_share_vendor_dirs() -> None:
+    # The AST-walk skip list and jscpd's ignore globs derive from the same
+    # vendor-dir set so the two scan paths can't drift apart. `.claude` is the
+    # only walk-specific extra; pin the exact relationship so a stray addition
+    # to either side is caught.
+    from flunk.detectors._walk import SKIP_DIRS
+
+    assert SKIP_DIRS == VENDOR_DIRS | {".claude"}

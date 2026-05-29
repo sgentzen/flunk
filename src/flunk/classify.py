@@ -22,6 +22,16 @@ _MIGRATION_DIRS = frozenset({"migrations", "alembic"})
 _TEST_DIRS = frozenset({"tests", "test"})
 _FIXTURE_DIRS = frozenset({"fixtures"})
 
+# Dependency / build / VCS dirs that hold vendored third-party code, not
+# hand-authored source. jscpd happily scans `.venv/Lib/site-packages/...` and
+# reports vendored JS/SVG as "duplication" — thousands of false positives — so
+# these must be excluded from its `--ignore` globs too, not just from the AST
+# walk. Single source of truth, shared with `detectors._walk.SKIP_DIRS`.
+VENDOR_DIRS = frozenset({
+    ".venv", "venv", "node_modules", "site-packages", ".worktrees",
+    "build", "dist", "__pycache__", ".tox", ".git",
+})
+
 
 class FileKind(Enum):
     SOURCE = "source"
@@ -66,7 +76,7 @@ def is_source(path: Path) -> bool:
 
 
 # Glob patterns for everything that is *not* production source. Mirrors the
-# `classify()` rules; handed to jscpd's `--ignore`.
+# `classify()` rules plus the vendor/build dirs; handed to jscpd's `--ignore`.
 NON_SOURCE_GLOBS: tuple[str, ...] = (
     "**/tests/**",
     "**/test/**",
@@ -83,4 +93,8 @@ NON_SOURCE_GLOBS: tuple[str, ...] = (
     "**/alembic/**",
     "**/fixtures/**",
     "**/*.md",
+    # Vendor/build dirs. NB: jscpd's --ignore was measured inert (see STATUS.md
+    # 2026-05-29) — the absolute-path fix in runners/jscpd.py is what actually
+    # excludes these; these globs guard any vendor dir that isn't git-ignored.
+    *(f"**/{d}/**" for d in sorted(VENDOR_DIRS)),
 )

@@ -43,10 +43,15 @@ def build_jscpd_cmd(
         "--silent",
         "--ignore", ",".join(NON_SOURCE_GLOBS),
         "--output", str(out_dir),
-        # Forward slashes, even on Windows: jscpd feeds this path to fast-glob,
-        # which treats backslashes as escape chars, so a native C:\path matches
-        # zero files and silently produces no duplication findings.
-        project.as_posix(),
+        # Absolute + forward-slashed, even on Windows:
+        # - resolve(): jscpd's default exclusion of vendored/build dirs (.venv,
+        #   .worktrees, node_modules, ...) only fires for an absolute path. A
+        #   relative '../proj' disables it, so jscpd scans the whole vendored
+        #   tree and reports thousands of third-party false-positive duplicates.
+        # - as_posix(): jscpd feeds this path to fast-glob, which treats
+        #   backslashes as escape chars, so a native C:\path matches zero files
+        #   and silently produces no duplication findings.
+        project.resolve().as_posix(),
     ]
 
 
