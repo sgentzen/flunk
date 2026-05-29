@@ -63,7 +63,9 @@ def test_non_source_globs_exclude_vendor_dirs(vendor_dir: str) -> None:
 
 def test_walk_skip_dirs_share_vendor_dirs() -> None:
     # The AST-walk skip list and jscpd's ignore globs derive from the same
-    # vendor-dir set so the two scan paths can't drift apart.
+    # vendor-dir set so the two scan paths can't drift apart. `.claude` is the
+    # only walk-specific extra; pin the exact relationship so a stray addition
+    # to either side is caught.
     from flunk.detectors._walk import SKIP_DIRS
 
-    assert VENDOR_DIRS <= SKIP_DIRS
+    assert SKIP_DIRS == VENDOR_DIRS | {".claude"}
