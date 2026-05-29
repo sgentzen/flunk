@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
+from flunk.detectors import async_client_severity
 from flunk.findings import Finding
 
 PATTERNS_DIR = Path(__file__).parent / "patterns"
@@ -87,4 +88,4 @@ def post_process(findings: list[Finding]) -> list[Finding]:
                 replacement_url=first.replacement_url,
             )
         )
-    return out
+    return async_client_severity.refine(out)
