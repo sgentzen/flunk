@@ -49,6 +49,19 @@ def test_client_inside_loop_stays_high(tmp_path: Path) -> None:
     assert out[0].raw_severity is None
 
 
+def test_client_inside_comprehension_stays_high(tmp_path: Path) -> None:
+    src = tmp_path / "comp.py"
+    src.write_text(
+        "import httpx\n"
+        "def make(urls):\n"
+        "    return [httpx.Client() for u in urls]\n",
+        encoding="utf-8",
+    )
+    out = refine([_finding(src, 3)])
+    assert out[0].severity == "high"
+    assert out[0].raw_severity is None
+
+
 def test_non_async_client_findings_untouched(tmp_path: Path) -> None:
     src = tmp_path / "x.py"
     src.write_text("x = 1\n", encoding="utf-8")

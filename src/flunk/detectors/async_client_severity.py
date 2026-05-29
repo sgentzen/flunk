@@ -18,7 +18,10 @@ from pathlib import Path
 from flunk.findings import Finding
 
 RULE_ID = "flunk.async-client-in-fn"
-_LOOP_NODES = (ast.For, ast.AsyncFor, ast.While, ast.comprehension)
+_LOOP_NODES = (
+    ast.For, ast.AsyncFor, ast.While,
+    ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp,
+)
 _CLIENT_ATTRS = frozenset({"AsyncClient", "Client"})
 
 _ONESHOT_MSG = (
