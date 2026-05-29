@@ -2,7 +2,8 @@
 #
 # Strategy: match every `os.environ.get(...)` and `os.getenv(...)` call.
 # The Python post-process pass (catalog/__init__.py) groups by file and
-# only emits a finding when count ≥ 5 in a single file.
+# only emits a finding when count ≥ 3 in a single file (presence-check
+# branches are filtered out first; see catalog/env_read_filter.py).
 #
 # Why not threshold inside Semgrep: Semgrep is per-pattern, not per-file
 # aggregating. Aggregation lives in Python so we can also count across

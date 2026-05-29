@@ -6,7 +6,7 @@ The human-readable rule descriptions are below. The actual Semgrep YAML lives in
 
 | # | Trigger | Replacement | Severity | Evidence |
 |---|---|---|---|---|
-| 1 | `os.environ.get` ≥5× in one file with manual `int()` / `float()` / `.lower() == "true"` coercion | `pydantic-settings` | high | `erate-filing-assistant`, `erate-prospector` (job-stalker excluded 2026-05-29 — its os.environ hits are presence-check branches, not config reads (see env_read_filter)) |
+| 1 | `os.environ.get` ≥3× in one file (presence-check branches excluded) with manual `int()` / `float()` / `.lower() == "true"` coercion | `pydantic-settings` | high | `erate-filing-assistant`, `erate-prospector` (job-stalker excluded 2026-05-29 — its os.environ hits are presence-check branches, not config reads (see env_read_filter)) |
 | 2 | Hand-rolled retry: `for attempt in range(...); ... sleep(2**...)` or equivalent exponential backoff loop | `tenacity` | high | `erate-filing-assistant` |
 | 3 | `pyproject.toml` exists with no `[project.dependencies]` while `requirements.txt` / `.in` declares deps | Consolidate to pyproject + `uv pip compile` lockfile | medium | `erate-filing-assistant`, `erate-prospector` |
 | 4 | `_apply_inplace_migrations()` or `ALTER TABLE` runner pattern w/o a migration tool | `Alembic` | medium | `job-stalker` |

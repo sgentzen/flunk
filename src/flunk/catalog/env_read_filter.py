@@ -10,6 +10,12 @@ A match is a CONFIG READ (kept) when its value flows somewhere: assigned, return
 passed as an argument, stored in a dict/attr. It is a PRESENCE CHECK (dropped) when the
 call is the test expression of an `if`/`while`/`assert` (or IfExp), or the direct operand
 of `not`, or a comparison against a constant inside such a test.
+
+Scope: only the `os.environ.get(...)` / `os.getenv(...)` call forms are considered.
+The subscript form `os.environ["KEY"]` (which the YAML also matches) is intentionally
+NOT filtered — a bare subscript in a boolean test raises KeyError on a missing key, so
+it is never written as a presence check. Erring toward keeping a finding is the safe
+direction for a false-positive correction.
 """
 
 from __future__ import annotations
