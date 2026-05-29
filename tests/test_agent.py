@@ -141,3 +141,28 @@ def test_excerpt_embedded_in_plan(tmp_path: Path) -> None:
         project_root=tmp_path,
     )
     assert ">> 2  token = os.environ.get('X')" in out
+
+
+def test_agent_prefers_judged_rationale(tmp_path):
+    from flunk.agent import build_plan
+    from flunk.findings import Finding
+
+    f = Finding("flunk.async-client-in-fn", "anti-pattern", "medium",
+                tmp_path / "a.py", 1, "msg",
+                rationale="one-shot HEAD to a redirector; pooling moot", judged=True)
+    (tmp_path / "a.py").write_text("httpx.AsyncClient()\n", encoding="utf-8")
+    plan = build_plan([f], project_root=tmp_path)
+    assert "one-shot HEAD to a redirector" in plan
+
+
+def test_agent_groups_skip_separately(tmp_path):
+    from flunk.agent import build_plan
+    from flunk.findings import Finding
+
+    f = Finding("flunk.duplication", "duplication", "skip",
+                tmp_path / "d.py", 1, "msg",
+                rationale="unrelated functions, not real duplication", judged=True)
+    (tmp_path / "d.py").write_text("x = 1\n", encoding="utf-8")
+    plan = build_plan([f], project_root=tmp_path)
+    assert "not worth doing" in plan.lower()
+    assert "unrelated functions" in plan

@@ -12,6 +12,9 @@ dependencies = [
     "typer>=0.25.1",
 ]
 
+[project.optional-dependencies]
+judge = ["anthropic>=0.40.0"]
+
 [project.scripts]
 flunk = "flunk:main"
 

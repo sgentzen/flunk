@@ -10,6 +10,7 @@ import json
 import sys
 
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from flunk.findings import CATEGORY_ORDER, SEVERITY_ORDER, Finding
@@ -18,6 +19,7 @@ SEVERITY_STYLE = {
     "high": "bold red",
     "medium": "yellow",
     "nitpick": "dim",
+    "skip": "dim italic",
     "suppressed": "dim strike",
 }
 
@@ -50,9 +52,11 @@ def render_table(findings: list[Finding], *, top: int, console: Console) -> None
         style = SEVERITY_STYLE.get(f.severity, "")
         sev_cell = f"[{style}]{f.severity}[/{style}]" if style else f.severity
         loc = f"{f.file}:{f.line}"
-        msg = f.message
+        msg = escape(f.rationale or f.message)
+        if f.severity == "skip":
+            msg = f"{escape('[skip — not worth doing]')} {msg}"
         if f.demoted_by:
-            msg = f"{msg} [dim](demoted: {f.demoted_by})[/dim]"
+            msg = f"{msg} [dim](demoted: {escape(f.demoted_by)})[/dim]"
         table.add_row(sev_cell, f.category, loc, msg, f.replacement or "")
     console.print(table)
 

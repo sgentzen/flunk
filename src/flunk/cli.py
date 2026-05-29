@@ -12,6 +12,7 @@ from flunk import agent as agent_mod
 from flunk import decisions as decisions_mod
 from flunk import demote as demote_mod
 from flunk import detectors as detectors_mod
+from flunk import judge as judge_mod
 from flunk import profile as profile_mod
 from flunk import rank as rank_mod
 from flunk.runners import jscpd as jscpd_runner
@@ -25,6 +26,13 @@ app = typer.Typer(
 console = Console()
 # Status spinner goes to stderr so --json (and piped) stdout stays clean.
 err_console = Console(stderr=True)
+
+
+def _build_judge_client(model: str):
+    """Construct the Anthropic-backed judge client (kept here so tests can stub it)."""
+    from flunk.judge_anthropic import AnthropicJudgeClient
+
+    return AnthropicJudgeClient(model=model)
 
 
 @app.command()
@@ -67,6 +75,18 @@ def audit(
             "pydantic-settings, csrf, secure-headers) by one tier."
         ),
     ),
+    judge: bool = typer.Option(
+        False,
+        "--judge",
+        help="Send findings to an LLM to re-rate severity and rewrite rationale "
+             "for the specific code (needs `pip install 'flunk[judge]'` + "
+             "ANTHROPIC_API_KEY). Off by default; the static pipeline is unchanged.",
+    ),
+    judge_model: str = typer.Option(
+        "claude-sonnet-4-6",
+        "--judge-model",
+        help="Model for the --judge pass.",
+    ),
 ) -> None:
     """Audit a Python project for AI cut-corners."""
     with err_console.status("[bold]Auditing…", spinner="dots") as status:
@@ -105,6 +125,19 @@ def audit(
         findings = decisions_mod.apply_decisions(
             findings, decisions_mod.load_decisions(project)
         )
+
+        if judge:
+            status.update("[bold]Judging findings with the LLM…")
+            try:
+                client = _build_judge_client(judge_model)
+            except RuntimeError as e:
+                status.stop()
+                console.print("[bold red]error:[/bold red] ", end="")
+                console.print(str(e), markup=False)
+                raise typer.Exit(code=2)
+            findings = judge_mod.judge_findings(
+                findings, client=client, project_root=project
+            )
 
         status.update("[bold]Ranking findings…")
         findings = rank_mod.rank(findings)

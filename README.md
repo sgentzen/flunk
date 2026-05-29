@@ -34,6 +34,21 @@ flunk ./my-project --no-demote        # show everything, even justified findings
 
 Exit code is always `0` when the audit completes — flunk is a report, not a gate. Wire it into your own CI with `--json` and a script that decides what to fail on.
 
+### Optional: LLM judgment pass
+
+By default flunk is fully static and offline. For code-specific severity and
+rationale, add `--judge`:
+
+    pip install 'flunk[judge]'
+    export ANTHROPIC_API_KEY=...          # PowerShell: $env:ANTHROPIC_API_KEY="..."
+    flunk ./yourproject --judge
+
+The judge re-rates each finding for its actual call site and rewrites the
+"why it's worse" note to reason about your code. Findings it deems not worth
+fixing are kept in the output under "Judged not worth doing", never silently
+dropped. Security/correctness findings can be escalated but never downgraded.
+Pick the model with `--judge-model` (default `claude-sonnet-4-6`).
+
 ## What it catches
 
 15 curated OSS-replacement rules, each backed by evidence from real-world Python projects. Full list in [docs/CATALOG.md](docs/CATALOG.md). Highlights:
