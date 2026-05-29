@@ -31,3 +31,20 @@ def test_file_breaks_remaining_ties() -> None:
     a = _f("high", "oss-catalog", "a.py")
     b = _f("high", "oss-catalog", "z.py")
     assert rank([b, a]) == [a, b]
+
+
+def test_skip_severity_has_style_and_sorts_last():
+    from rich.console import Console
+    from flunk.findings import Finding
+    from flunk import rank as rank_mod
+    from pathlib import Path
+
+    findings = [
+        Finding("flunk.duplication", "duplication", "skip", Path("d.py"), 1,
+                "located but not worth doing", rationale="unrelated funcs", judged=True),
+        Finding("flunk.async-client-in-fn", "anti-pattern", "high", Path("a.py"), 1, "real"),
+    ]
+    ranked = rank_mod.rank(findings)
+    assert ranked[0].severity == "high"
+    assert ranked[-1].severity == "skip"
+    rank_mod.render_table(ranked, top=10, console=Console())

@@ -129,9 +129,15 @@ def build_plan(
         out.append("---")
         prefix = f"{emoji} " if emoji else ""
         out.append(f"## {prefix}{sev.upper()} · {rule_id} · {n} {occ}")
+        if sev == "skip":
+            out.append("")
+            out.append("> **Judged not worth doing** — kept here with the judge's reason; no action expected.")
         out.append("")
-        if meta.rationale:
-            out.append(f"**Why it's worse:** {meta.rationale}")
+        judged_rationale = next((f.rationale for f in fs if f.rationale), None)
+        why = judged_rationale or meta.rationale
+        if why:
+            label = "Judge's take" if judged_rationale else "Why it's worse"
+            out.append(f"**{label}:** {why}")
             out.append("")
         fix_line = f"**Fix:** {meta.replacement}"
         if meta.replacement_url:
