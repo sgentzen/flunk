@@ -63,7 +63,15 @@ Driven by an external eval of a job-stalker scan ("locates well, judges poorly")
 - **pydantic-settings ignores presence checks** ([env_read_filter.py](src/flunk/catalog/env_read_filter.py)): `if not os.environ.get(...)` branch guards are no longer counted as config reads. job-stalker dropped from the rule's expected-fires (its 3 hits were all presence checks).
 - **jscpd noise cut**: min-tokens 50 → 70 and clone pairs < 6 lines dropped (`MIN_DUP_LINES`).
 
-Known follow-up (flagged during implementation): the jscpd runner's `NON_SOURCE_GLOBS` doesn't exclude `.venv`/`site-packages`/`node_modules`/`.worktrees`, so it scans vendored deps — a separate fix.
+Known follow-up (flagged during implementation): the jscpd runner's `NON_SOURCE_GLOBS` doesn't exclude `.venv`/`site-packages`/`node_modules`/`.worktrees`, so it scans vendored deps — a separate fix. **Fixed 2026-05-29, see below.**
+
+## jscpd vendored-deps false positives (2026-05-29)
+
+Symptom: a jscpd run on `job-stalker` reported **3178** duplicates, almost all from `.venv/Lib/site-packages/...` and `.worktrees/.../.venv/...` vendored third-party code (the eval expected ~10).
+
+Diagnosis was empirical, not assumed. Two changes, both TDD'd:
+- **Real root cause — relative scan path defeated jscpd's exclusion** ([runners/jscpd.py](src/flunk/runners/jscpd.py)): jscpd only excludes vendored/build dirs (`.venv`, `.worktrees`, `node_modules`, ...) when handed an **absolute** path. The runner passed `project.as_posix()` (e.g. `../job-stalker`), and the `..` prefix silently disabled that exclusion — so jscpd walked the whole vendored tree. Measured directly: absolute path → 29 raw clone pairs, relative `../` path → 3178, *with `--ignore` having zero effect in either mode*. Fix: `project.resolve().as_posix()`. job-stalker findings: **3178 → 6** (29 raw pairs, `MIN_DUP_LINES` filters to 6).
+- **Defense-in-depth — vendor globs in `NON_SOURCE_GLOBS`** ([classify.py](src/flunk/classify.py)): added `**/<dir>/**` for each of a new shared `VENDOR_DIRS` frozenset (`.venv`, `venv`, `node_modules`, `site-packages`, `.worktrees`, `build`, `dist`, `__pycache__`, `.tox`, `.git`). `detectors/_walk.py`'s `SKIP_DIRS` now derives from `VENDOR_DIRS` (+ `.claude`) so the AST-walk and jscpd scan paths can't drift. Note: these globs don't actually fire today (jscpd's `--ignore` was inert in the measurements above) — they're documented intent plus protection for any vendored dir that isn't git-ignored.
 
 ## v1.5+ backlog (do not start before v1 ships)
 

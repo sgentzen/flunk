@@ -6,12 +6,11 @@ import ast
 from collections.abc import Iterator
 from pathlib import Path
 
-from flunk.classify import is_source
+from flunk.classify import VENDOR_DIRS, is_source
 
-SKIP_DIRS = frozenset({
-    ".venv", "venv", "node_modules", ".git", "build", "dist",
-    "__pycache__", ".tox", ".worktrees", ".claude",
-})
+# Vendor/build/VCS dirs (shared with jscpd's ignore globs via VENDOR_DIRS),
+# plus `.claude` which only the AST walk needs to skip.
+SKIP_DIRS = VENDOR_DIRS | {".claude"}
 
 
 def walk_py(project: Path, *, source_only: bool = True) -> Iterator[Path]:
