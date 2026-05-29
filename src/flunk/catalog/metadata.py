@@ -262,6 +262,22 @@ CATALOG: dict[str, RuleMeta] = {
 }
 
 
+# Rules whose severity the LLM judge may RAISE or re-explain, but never lower
+# or skip — a confident-but-wrong model must not be able to bury a real
+# security/correctness defect. Everything else is judgment-prone and fully
+# judge-able (including a "skip" verdict).
+SECURITY_RULES: frozenset[str] = frozenset({
+    "flunk.sql-injection",
+    "flunk.csrf-middleware",
+    "flunk.f811-suppression",
+    "flunk.bare-except-security",
+})
+
+
+def is_security_rule(rule_id: str) -> bool:
+    return rule_id in SECURITY_RULES
+
+
 def lookup(rule_id: str) -> RuleMeta:
     """Return metadata for a rule_id, with a safe fallback for unknown rules."""
     if rule_id in CATALOG:
