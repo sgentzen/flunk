@@ -35,3 +35,6 @@ class Finding:
             raw_severity=self.raw_severity or self.severity,
             demoted_by=marker,
         )
+
+    def with_message(self, new_message: str) -> Finding:
+        return replace(self, message=new_message)

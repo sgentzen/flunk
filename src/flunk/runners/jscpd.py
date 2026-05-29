@@ -22,6 +22,10 @@ from flunk.findings import Finding
 
 JSCPD_RULE_ID = "flunk.duplication"
 
+# Clone pairs shorter than this are almost always generic scaffolding
+# (def headers, `try:` / `async with` blocks) rather than real copy-paste.
+MIN_DUP_LINES = 6
+
 
 def build_jscpd_cmd(
     cmd_prefix: list[str], project: Path, out_dir: Path, *, min_tokens: int
@@ -75,8 +79,10 @@ def resolve_cmd_prefix() -> list[str] | None:
     return None
 
 
-def run(project: Path, *, min_tokens: int = 50) -> list[Finding]:
+def run(project: Path, *, min_tokens: int = 70) -> list[Finding]:
     """Run jscpd. Returns [] if jscpd or node is unavailable."""
+    # min_tokens 70 (up from jscpd's lower defaults): a higher floor drops the
+    # generic boilerplate clones that dominated the noise in the 2026-05-29 eval.
     cmd_prefix = resolve_cmd_prefix()
     if cmd_prefix is None:
         return []
@@ -99,15 +105,22 @@ def run(project: Path, *, min_tokens: int = 50) -> list[Finding]:
         except (OSError, json.JSONDecodeError):
             return []
 
+    return _findings_from_payload(payload)
+
+
+def _findings_from_payload(payload: dict) -> list[Finding]:
+    """Parse a jscpd report payload into Findings, dropping short noise pairs."""
     meta = lookup(JSCPD_RULE_ID)
     findings: list[Finding] = []
     for dup in payload.get("duplicates", []):
+        lines = int(dup.get("lines") or 0)
+        if lines < MIN_DUP_LINES:
+            continue
         first = dup.get("firstFile", {})
         second = dup.get("secondFile", {})
         path = first.get("name") or first.get("path")
         if not path:
             continue
-        lines = int(dup.get("lines") or 0)
         tokens = int(dup.get("tokens") or 0)
         findings.append(
             Finding(

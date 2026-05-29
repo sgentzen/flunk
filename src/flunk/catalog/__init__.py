@@ -12,6 +12,8 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
+from flunk.catalog.env_read_filter import drop_presence_checks
+from flunk.detectors import async_client_severity
 from flunk.findings import Finding
 
 PATTERNS_DIR = Path(__file__).parent / "patterns"
@@ -60,6 +62,8 @@ def post_process(findings: list[Finding]) -> list[Finding]:
         if any(s in path_str for s in substrings):
             filtered.append(f)
 
+    filtered = drop_presence_checks(filtered)
+
     aggregated: dict[tuple[str, Path], list[Finding]] = defaultdict(list)
     passthrough: list[Finding] = []
 
@@ -87,4 +91,4 @@ def post_process(findings: list[Finding]) -> list[Finding]:
                 replacement_url=first.replacement_url,
             )
         )
-    return out
+    return async_client_severity.refine(out)

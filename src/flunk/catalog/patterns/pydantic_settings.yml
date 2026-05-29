@@ -2,14 +2,17 @@
 #
 # Strategy: match every `os.environ.get(...)` and `os.getenv(...)` call.
 # The Python post-process pass (catalog/__init__.py) groups by file and
-# only emits a finding when count ≥ 5 in a single file.
+# only emits a finding when count ≥ 3 in a single file (presence-check
+# branches are filtered out first; see catalog/env_read_filter.py).
 #
 # Why not threshold inside Semgrep: Semgrep is per-pattern, not per-file
 # aggregating. Aggregation lives in Python so we can also count across
 # multiple equivalent forms (`os.environ.get`, `os.getenv`,
 # `os.environ["KEY"]`) without a metavariable-comparison hack.
 #
-# Expected fires: job-stalker, erate-filing-assistant, erate-prospector
+# Expected fires: erate-filing-assistant, erate-prospector
+# (job-stalker excluded 2026-05-29 — its os.environ hits are presence-check
+#  branches, not config reads; see catalog/env_read_filter.py)
 rules:
   - id: flunk.pydantic-settings
     languages: [python]

@@ -78,3 +78,44 @@ def test_resolve_prefix_passes_plain_path_through(monkeypatch) -> None:
 def test_resolve_prefix_returns_none_when_absent(monkeypatch) -> None:
     monkeypatch.setattr(jscpd_mod.shutil, "which", lambda name: None)
     assert resolve_cmd_prefix() is None
+
+
+def test_short_clone_pairs_are_filtered():
+    """A clone pair shorter than MIN_DUP_LINES is dropped as boilerplate noise."""
+    from flunk.runners import jscpd as jscpd_runner
+
+    report = {
+        "duplicates": [
+            {  # noise: 3-line generic scaffolding
+                "lines": 3, "tokens": 80,
+                "firstFile": {"name": "a.py", "startLoc": {"line": 10}},
+                "secondFile": {"name": "b.py", "startLoc": {"line": 40}},
+            },
+            {  # real: 8-line copied block
+                "lines": 8, "tokens": 120,
+                "firstFile": {"name": "c.py", "startLoc": {"line": 5}},
+                "secondFile": {"name": "d.py", "startLoc": {"line": 90}},
+            },
+        ]
+    }
+    findings = jscpd_runner._findings_from_payload(report)
+    assert len(findings) == 1
+    assert findings[0].file.name == "c.py"
+
+
+def test_clone_pair_at_exact_min_lines_is_kept():
+    """A clone pair exactly at MIN_DUP_LINES (6) is kept — the guard is strict `<`."""
+    from flunk.runners import jscpd as jscpd_runner
+
+    report = {
+        "duplicates": [
+            {
+                "lines": jscpd_runner.MIN_DUP_LINES, "tokens": 100,
+                "firstFile": {"name": "e.py", "startLoc": {"line": 1}},
+                "secondFile": {"name": "f.py", "startLoc": {"line": 50}},
+            },
+        ]
+    }
+    findings = jscpd_runner._findings_from_payload(report)
+    assert len(findings) == 1
+    assert findings[0].file.name == "e.py"

@@ -26,7 +26,7 @@ import ast
 from pathlib import Path
 
 from flunk.catalog.metadata import lookup
-from flunk.detectors._walk import walk_py
+from flunk.detectors._walk import ancestors, build_parent_map, walk_py
 from flunk.findings import Finding
 
 RULE_ID = "flunk.inline-import"
@@ -74,16 +74,7 @@ def _is_type_checking(test: ast.expr) -> bool:
 
 def _inline_first_party_lines(tree: ast.AST, roots: set[str]) -> list[int]:
     """Line numbers of first-party imports nested in a function body."""
-    parents: dict[ast.AST, ast.AST] = {}
-    for node in ast.walk(tree):
-        for child in ast.iter_child_nodes(node):
-            parents[child] = node
-
-    def ancestors(node: ast.AST):
-        cur = parents.get(node)
-        while cur is not None:
-            yield cur
-            cur = parents.get(cur)
+    parents = build_parent_map(tree)
 
     lines: list[int] = []
     for node in ast.walk(tree):
@@ -93,7 +84,7 @@ def _inline_first_party_lines(tree: ast.AST, roots: set[str]) -> list[int]:
             continue
         in_function = False
         excluded = False
-        for anc in ancestors(node):
+        for anc in ancestors(node, parents):
             if isinstance(anc, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 in_function = True
             elif isinstance(anc, ast.Try) and any(
