@@ -25,7 +25,10 @@ EXPECTED_FIRES: dict[str, tuple[str, ...]] = {
     "flunk.alembic":                ("job_stalker",),
     "flunk.sql-injection":          ("erate_filing_assistant",),
     "flunk.async-client-in-fn":     ("erate_filing_assistant",),
-    "flunk.duplicate-retry":        ("erate_filing_assistant",),
+    # flunk.duplicate-retry: none of the 3 golden projects has >=2 *source*
+    # retry functions. The prior erate-filing-assistant fire was a false
+    # positive driven by pytest test_retry_* names. Behavior is covered by
+    # tests/test_duplicate_retry.py instead.
     "flunk.f811-suppression":       ("erate_prospector",),
     "flunk.bare-except-security":   ("erate_filing_assistant",),
     "flunk.inline-import":          ("job_stalker", "erate_filing_assistant"),

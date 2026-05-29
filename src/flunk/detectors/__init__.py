@@ -14,6 +14,7 @@ from . import (
     csrf_middleware,
     duplicate_retry,
     f811_suppression,
+    inline_import,
     module_singleton,
     requirements_vs_pyproject,
 )
@@ -22,6 +23,7 @@ _DETECTORS = (
     requirements_vs_pyproject.run,
     duplicate_retry.run,
     f811_suppression.run,
+    inline_import.run,
     module_singleton.run,
     csrf_middleware.run,
 )

@@ -45,6 +45,17 @@ Goal: a working `flunk audit ./project` that prints real findings from one real 
 - **`secure-headers`:** aggregated per-file with threshold 2 distinct header string mentions (one mention can be a comment or a string in an unrelated file).
 - **CLI signature:** `flunk <path>` (typer collapses single-command apps); spec called for `flunk audit <path>`. Cheap to add a subcommand later if multi-mode lands.
 
+## Signal-to-noise pass (2026-05-29)
+
+Driven by agent feedback on a real `job-stalker` scan that was ~2-of-7-rules actionable. Four phases, all TDD'd (97 tests pass). Net effect on job-stalker: **~83 → 21 findings**, only 2 high-severity.
+
+- **Phase 1 — file classification ([classify.py](src/flunk/classify.py)):** `is_source()` gates the AST detectors via `walk_py`; `NON_SOURCE_GLOBS` feed jscpd `--ignore`. Excludes tests/templates/fixtures/migrations. Killed the `duplicate-retry` false positive (pytest `test_retry_*` names) → it now fires on none of the 3 golden projects (each has 1 source retry fn); covered by [test_duplicate_retry.py](tests/test_duplicate_retry.py) instead. jscpd duplication on job-stalker: **68 → 10** (templates/fixtures/tests/md excluded).
+- **Phase 2 — inline-import as AST detector ([detectors/inline_import.py](src/flunk/detectors/inline_import.py)):** replaces the semgrep YAML (deleted). Counts only **first-party** function-body imports (a third-party lazy load can't be a circular-import band-aid), excludes `try/except ImportError`, `TYPE_CHECKING`, and `__main__.py`. Reports all occurrence lines. job-stalker: dropped the playwright + `__main__` false positives; the 4 redundant `Job` imports now surface with all 4 line numbers.
+- **Phase 3 — project profiles ([profile.py](src/flunk/profile.py)):** `--profile auto|single-user-local|web-service|unknown`. A single-user-local project (SQLite, no server-grade DB/server) down-weights `alembic`, `pydantic-settings`, `csrf-middleware`, `secure-headers` one tier, tagged `profile:single-user-local`. job-stalker inferred single-user-local → pydantic-settings high→medium, alembic medium→nitpick.
+- **Phase 4 — broader justification ([demote.py](src/flunk/demote.py) + [decisions.py](src/flunk/decisions.py)):** demote pass now also reads the **module docstring** (module-level justification applies to the whole file). New `.flunkignore` file records conscious "won't do" decisions (`rule_id: reason`) — matching findings are suppressed but **kept in output** with the reason, so the choice is logged not silently skipped.
+
+Known follow-up (spawned as a separate task): the jscpd runner's npx fallback couldn't launch on Windows (`.CMD` shim); fixed in-tree via `resolve_cmd_prefix` (`cmd /c` wrap). jscpd 4.x report-path output still worth confirming.
+
 ## v1.5+ backlog (do not start before v1 ships)
 
 - **Pre-flight mode** — hook into Claude Code / Cursor planning output, flag the cut-corner before code is written. Highest-value v2 feature per the codebase-maturity insight in [docs/PRODUCT.md](docs/PRODUCT.md).

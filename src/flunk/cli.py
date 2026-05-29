@@ -9,8 +9,10 @@ import typer
 from rich.console import Console
 
 from flunk import agent as agent_mod
+from flunk import decisions as decisions_mod
 from flunk import demote as demote_mod
 from flunk import detectors as detectors_mod
+from flunk import profile as profile_mod
 from flunk import rank as rank_mod
 from flunk.runners import jscpd as jscpd_runner
 from flunk.runners import semgrep as semgrep_runner
@@ -56,6 +58,15 @@ def audit(
         "--no-demote",
         help="Disable the justification-aware demote pass.",
     ),
+    profile: str = typer.Option(
+        "auto",
+        "--profile",
+        help=(
+            "Project profile: auto | single-user-local | web-service | unknown. "
+            "A single-user-local project down-weights infra rules (alembic, "
+            "pydantic-settings, csrf, secure-headers) by one tier."
+        ),
+    ),
 ) -> None:
     """Audit a Python project for AI cut-corners."""
     with err_console.status("[bold]Auditing…", spinner="dots") as status:
@@ -81,8 +92,25 @@ def audit(
             status.update("[bold]Demoting justified findings…")
             findings = demote_mod.demote(findings)
 
+        status.update("[bold]Applying project profile…")
+        try:
+            resolved_profile = profile_mod.resolve_profile(project, profile)
+        except ValueError as e:
+            status.stop()
+            console.print(f"[bold red]error:[/bold red] {e}")
+            raise typer.Exit(code=2)
+        findings = profile_mod.apply_profile(findings, resolved_profile)
+
+        status.update("[bold]Applying .flunkignore decisions…")
+        findings = decisions_mod.apply_decisions(
+            findings, decisions_mod.load_decisions(project)
+        )
+
         status.update("[bold]Ranking findings…")
         findings = rank_mod.rank(findings)
+
+    if not json_out and not agent_out:
+        err_console.print(f"[dim]project profile: {resolved_profile.value}[/dim]")
 
     if agent_out:
         # The plan is UTF-8 markdown (emoji, arrows); Windows' default cp1252

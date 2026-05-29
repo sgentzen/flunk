@@ -7,6 +7,7 @@ demote severity one tier.
 
 from __future__ import annotations
 
+import ast
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -16,20 +17,28 @@ from flunk.findings import Finding
 CONTEXT_LINES = 3
 DEMOTE_TIER = {"high": "medium", "medium": "nitpick", "nitpick": "suppressed"}
 
-# Case-insensitive; matched inside a comment context. Anchored to the
-# `#` so we don't accidentally demote on a string literal containing
-# "fall back" (e.g. an error message).
-MARKERS: list[str] = [
-    r"#.*deliberately",
-    r"#.*intentionally",
-    r"#.*we chose",
-    r"#.*fall back",
-    r"#.*rather than",
-    r"#.*tradeoff",
-    r"#.*justified",
-    r"#.*on purpose",
+# The justification phrases. Used two ways: anchored to `#` for nearby
+# comments (so a string literal like "we deliberately fail" doesn't match),
+# and unanchored for the module docstring (a deliberate string, where the
+# author is documenting a project-/module-level design choice).
+JUSTIFICATION_PHRASES: list[str] = [
+    "deliberately",
+    "intentionally",
+    "we chose",
+    "fall back",
+    "rather than",
+    "tradeoff",
+    "justified",
+    "on purpose",
 ]
-_MARKER_RE = re.compile("|".join(MARKERS), re.IGNORECASE)
+_MARKER_RE = re.compile(
+    "|".join(rf"#.*{p}" for p in JUSTIFICATION_PHRASES), re.IGNORECASE
+)
+_DOCSTRING_RE = re.compile("|".join(JUSTIFICATION_PHRASES), re.IGNORECASE)
+
+# Back-compat alias: the comment-anchored patterns were previously exposed
+# as MARKERS (and mirrored in CATALOG.md).
+MARKERS: list[str] = [rf"#.*{p}" for p in JUSTIFICATION_PHRASES]
 
 
 @lru_cache(maxsize=2048)
@@ -40,8 +49,21 @@ def _read_lines(path: Path) -> tuple[str, ...]:
         return ()
 
 
+@lru_cache(maxsize=2048)
+def _module_docstring(path: Path) -> str | None:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, SyntaxError):
+        return None
+    return ast.get_docstring(tree)
+
+
 def _find_marker(path: Path, line: int) -> str | None:
-    """Return the matched marker phrase, or None."""
+    """Return the matched justification phrase, or None.
+
+    Looks first at comments within +-CONTEXT_LINES of the finding, then at the
+    module docstring (a module-level justification applies to the whole file).
+    """
     lines = _read_lines(path)
     if not lines:
         return None
@@ -51,7 +73,15 @@ def _find_marker(path: Path, line: int) -> str | None:
     end = min(len(lines), idx + CONTEXT_LINES + 1)
     window = "\n".join(lines[start:end])
     m = _MARKER_RE.search(window)
-    return m.group(0).strip() if m else None
+    if m:
+        return m.group(0).strip()
+
+    docstring = _module_docstring(path)
+    if docstring:
+        dm = _DOCSTRING_RE.search(docstring)
+        if dm:
+            return f"module docstring: …{dm.group(0)}…"
+    return None
 
 
 def demote(findings: list[Finding]) -> list[Finding]:
