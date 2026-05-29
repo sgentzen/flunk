@@ -17,6 +17,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from flunk.detectors._walk import build_parent_map
 from flunk.findings import Finding
 
 RULE_ID = "flunk.pydantic-settings"
@@ -47,10 +48,7 @@ def _is_env_call(node: ast.AST) -> bool:
 
 def _presence_check_lines(tree: ast.AST) -> set[int]:
     """Lines where an env call appears only as a branch/boolean test."""
-    parents: dict[ast.AST, ast.AST] = {}
-    for parent in ast.walk(tree):
-        for child in ast.iter_child_nodes(parent):
-            parents[child] = parent
+    parents = build_parent_map(tree)
 
     def in_test_position(call: ast.AST) -> bool:
         # Walk up through not/bool-op/compare wrappers; the env call is a

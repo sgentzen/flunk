@@ -30,3 +30,24 @@ def test_walk_py_include_all_opt_out(tmp_path: Path) -> None:
 
     found = {p.relative_to(tmp_path).as_posix() for p in walk_py(tmp_path, source_only=False)}
     assert found == {"pkg/handler.py", "tests/test_handler.py"}
+
+
+def test_build_parent_map_and_ancestors():
+    import ast
+    from flunk.detectors._walk import build_parent_map, ancestors
+
+    tree = ast.parse("def f():\n    for x in y:\n        z = 1\n")
+    parents = build_parent_map(tree)
+    # find the assignment target node `z`
+    assign = next(n for n in ast.walk(tree) if isinstance(n, ast.Assign))
+    anc_types = [type(a).__name__ for a in ancestors(assign, parents)]
+    # nearest-to-root: For -> FunctionDef -> Module
+    assert anc_types == ["For", "FunctionDef", "Module"]
+
+
+def test_ancestors_of_root_is_empty():
+    import ast
+    from flunk.detectors._walk import build_parent_map, ancestors
+    tree = ast.parse("x = 1\n")
+    parents = build_parent_map(tree)
+    assert list(ancestors(tree, parents)) == []

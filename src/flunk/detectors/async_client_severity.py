@@ -15,6 +15,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from flunk.detectors._walk import ancestors, build_parent_map
 from flunk.findings import Finding
 
 RULE_ID = "flunk.async-client-in-fn"
@@ -44,16 +45,12 @@ def _is_httpx_client_call(node: ast.AST) -> bool:
 
 def _construction_in_loop(tree: ast.AST, line: int) -> bool:
     """True if an httpx client call on `line` has a loop among its ancestors."""
-    parents: dict[ast.AST, ast.AST] = {}
-    for parent in ast.walk(tree):
-        for child in ast.iter_child_nodes(parent):
-            parents[child] = parent
+    parents = build_parent_map(tree)
 
     for node in ast.walk(tree):
         if getattr(node, "lineno", None) != line or not _is_httpx_client_call(node):
             continue
-        cur = parents.get(node)
-        while cur is not None:
+        for cur in ancestors(node, parents):
             if isinstance(cur, _LOOP_NODES):
                 return True
             if isinstance(cur, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -61,7 +58,6 @@ def _construction_in_loop(tree: ast.AST, line: int) -> bool:
                 # (e.g. wrapping the call site) is the cross-function case we
                 # deliberately don't model.
                 return False
-            cur = parents.get(cur)
     return False
 
 

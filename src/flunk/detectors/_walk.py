@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -26,3 +27,20 @@ def walk_py(project: Path, *, source_only: bool = True) -> Iterator[Path]:
         if source_only and not is_source(path):
             continue
         yield path
+
+
+def build_parent_map(tree: ast.AST) -> dict[ast.AST, ast.AST]:
+    """Map each AST node to its parent (child -> parent)."""
+    parents: dict[ast.AST, ast.AST] = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+    return parents
+
+
+def ancestors(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> Iterator[ast.AST]:
+    """Yield a node's ancestors from nearest parent up to the root."""
+    cur = parents.get(node)
+    while cur is not None:
+        yield cur
+        cur = parents.get(cur)
