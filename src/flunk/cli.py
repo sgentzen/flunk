@@ -19,6 +19,8 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+# Status spinner goes to stderr so --json (and piped) stdout stays clean.
+err_console = Console(stderr=True)
 
 
 @app.command()
@@ -49,22 +51,31 @@ def audit(
     ),
 ) -> None:
     """Audit a Python project for AI cut-corners."""
-    try:
-        findings = semgrep_runner.run(project)
-    except semgrep_runner.SemgrepNotFound as e:
-        console.print(f"[bold red]error:[/bold red] {e}")
-        raise typer.Exit(code=2)
-    except RuntimeError as e:
-        console.print(f"[bold red]semgrep failed:[/bold red] {e}")
-        raise typer.Exit(code=1)
+    with err_console.status("[bold]Auditing…", spinner="dots") as status:
+        status.update("[bold]Running semgrep catalog rules…")
+        try:
+            findings = semgrep_runner.run(project)
+        except semgrep_runner.SemgrepNotFound as e:
+            status.stop()
+            console.print(f"[bold red]error:[/bold red] {e}")
+            raise typer.Exit(code=2)
+        except RuntimeError as e:
+            status.stop()
+            console.print(f"[bold red]semgrep failed:[/bold red] {e}")
+            raise typer.Exit(code=1)
 
-    findings.extend(detectors_mod.run_all(project))
-    findings.extend(jscpd_runner.run(project))
+        status.update("[bold]Running custom detectors…")
+        findings.extend(detectors_mod.run_all(project))
 
-    if not no_demote:
-        findings = demote_mod.demote(findings)
+        status.update("[bold]Scanning for duplication (jscpd)…")
+        findings.extend(jscpd_runner.run(project))
 
-    findings = rank_mod.rank(findings)
+        if not no_demote:
+            status.update("[bold]Demoting justified findings…")
+            findings = demote_mod.demote(findings)
+
+        status.update("[bold]Ranking findings…")
+        findings = rank_mod.rank(findings)
 
     if json_out:
         rank_mod.render_json(findings)
