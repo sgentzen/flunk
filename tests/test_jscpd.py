@@ -101,3 +101,21 @@ def test_short_clone_pairs_are_filtered():
     findings = jscpd_runner._findings_from_payload(report)
     assert len(findings) == 1
     assert findings[0].file.name == "c.py"
+
+
+def test_clone_pair_at_exact_min_lines_is_kept():
+    """A clone pair exactly at MIN_DUP_LINES (6) is kept — the guard is strict `<`."""
+    from flunk.runners import jscpd as jscpd_runner
+
+    report = {
+        "duplicates": [
+            {
+                "lines": jscpd_runner.MIN_DUP_LINES, "tokens": 100,
+                "firstFile": {"name": "e.py", "startLoc": {"line": 1}},
+                "secondFile": {"name": "f.py", "startLoc": {"line": 50}},
+            },
+        ]
+    }
+    findings = jscpd_runner._findings_from_payload(report)
+    assert len(findings) == 1
+    assert findings[0].file.name == "e.py"

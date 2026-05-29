@@ -81,6 +81,8 @@ def resolve_cmd_prefix() -> list[str] | None:
 
 def run(project: Path, *, min_tokens: int = 70) -> list[Finding]:
     """Run jscpd. Returns [] if jscpd or node is unavailable."""
+    # min_tokens 70 (up from jscpd's lower defaults): a higher floor drops the
+    # generic boilerplate clones that dominated the noise in the 2026-05-29 eval.
     cmd_prefix = resolve_cmd_prefix()
     if cmd_prefix is None:
         return []
