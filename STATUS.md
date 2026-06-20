@@ -83,6 +83,38 @@ Plan 2 of the hybrid judgment work (design + plans under `docs/superpowers/`). `
 - Default off; the static pipeline is unchanged and imports no `anthropic`. CLI: `--judge` / `--judge-model` (default `claude-sonnet-4-6`).
 - Open decision: the justification-demote pass runs before the judge, so a `SECURITY_RULES` finding can be demoted (by a human "deliberately…" comment) below catalog before the judge's clamp floor sees it. `raw_severity` provenance is preserved; deciding whether to exempt security rules from demote is a follow-up.
 
+## Self-audit false positives — flunk flunked itself (2026-06-19)
+
+Running `flunk ./src` on flunk's own source produced 2 findings, both pure
+self-reference: detectors greppng raw text matched their own meta-text.
+- `f811-suppression` (HIGH): the regex `#\s*noqa\s*:.*\bF811\b` matched the
+  detector's own documentation comment `# Inline \`# noqa: F811\`` — prose that
+  *quotes* a directive is not a directive.
+- `csrf-middleware`: the file's comment `# Find first csrf-token line` tripped
+  `_CSRF_RE`, and the regex-pattern strings (`BaseHTTPMiddleware`, `dispatch`)
+  tripped `_MIDDLEWARE_RE` — both signals came from string/comment meta-text.
+
+Fix (TDD, the same lesson `demote.py` already learned about anchoring to `#`):
+- New [detectors/_source.py](src/flunk/detectors/_source.py) — tokenize-aware
+  helpers. `iter_comments()` yields only real comment tokens (a `#` in a string
+  is skipped; syntax-error files fall back to a naive per-line scan, results
+  collected fully so a mid-stream tokenize error can't duplicate). `code_lines()`
+  blanks comment text but keeps string literals (a header/cookie name is a real
+  signal).
+- f811 now anchors `^#\s*noqa…F811` against real comment tokens (not raw lines).
+  The config-path per-file-ignore check is unchanged — that's how the rule fires
+  on erate-prospector, verified still green.
+- csrf now matches the code layer (comments stripped, strings kept). Real custom
+  CSRF middleware on erate-filing-assistant fires from `csrf_token` names /
+  `"X-CSRF-Token"` strings / a `BaseHTTPMiddleware` dispatch class — verified
+  still green.
+- Tests: [test_source_helpers.py](tests/test_source_helpers.py),
+  [test_f811_suppression.py](tests/test_f811_suppression.py),
+  [test_csrf_middleware.py](tests/test_csrf_middleware.py), and a
+  [test_self_audit.py](tests/test_self_audit.py) "physician, heal thyself"
+  regression guard. Full suite 155 passed; `flunk .` on the repo root is now 0
+  findings. semgrep clean on the changed files.
+
 ## v1.5+ backlog (do not start before v1 ships)
 
 - **Pre-flight mode** — hook into Claude Code / Cursor planning output, flag the cut-corner before code is written. Highest-value v2 feature per the codebase-maturity insight in [docs/PRODUCT.md](docs/PRODUCT.md).
