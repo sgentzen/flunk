@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-06-19
+
+### Fixed
+
+- Detectors no longer flag flunk's own source. Running `flunk` on flunk
+  reported two false positives — a HIGH-severity `f811-suppression` on a
+  documentation comment that *quotes* `# noqa: F811`, and a `csrf-middleware`
+  hit on the detector's own regex-pattern strings and a `csrf-token` comment.
+  Both detectors now match the **code layer** via a new tokenize-aware helper
+  (`detectors/_source.py`): the F811 rule anchors to real comment directives,
+  and the CSRF rule strips comments while keeping string literals (a header or
+  cookie name like `"X-CSRF-Token"` is a real signal). The F811 per-file-ignore
+  config path is unchanged ([#7]).
+
 ## [0.1.0] — 2026-05-26
 
 Initial release. Single-command CLI that audits a Python project for AI
@@ -61,5 +75,7 @@ ranks by severity, prints a `rich` table.
   (`security|auth|crypto|csrf|jwt|token`) — a bare except in
   `services/cleanup.py` isn't the smell; one in `auth/jwt.py` is.
 
-[unreleased]: https://github.com/sgentzen/flunk/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/sgentzen/flunk/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/sgentzen/flunk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/sgentzen/flunk/releases/tag/v0.1.0
+[#7]: https://github.com/sgentzen/flunk/pull/7
