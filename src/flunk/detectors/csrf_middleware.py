@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 from flunk.catalog.metadata import lookup
+from flunk.detectors._source import code_lines
 from flunk.detectors._walk import walk_py
 from flunk.findings import Finding
 
@@ -29,14 +30,20 @@ def run(project: Path) -> list[Finding]:
     out: list[Finding] = []
     for path in walk_py(project):
         try:
-            text = path.read_text(encoding="utf-8", errors="replace")
+            source = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        if not _CSRF_RE.search(text) or not _MIDDLEWARE_RE.search(text):
+        # Match the code layer only: a comment mentioning csrf, or a regex
+        # pattern string that contains "BaseHTTPMiddleware", is meta-text, not
+        # a custom CSRF middleware. String literals are kept — a header/cookie
+        # name like "X-CSRF-Token" is a real signal.
+        code = code_lines(source)
+        code_text = "\n".join(code)
+        if not _CSRF_RE.search(code_text) or not _MIDDLEWARE_RE.search(code_text):
             continue
-        # Find first csrf-token line for actionable lineno.
+        # Find first csrf-token line (in code) for actionable lineno.
         lineno = 1
-        for i, line in enumerate(text.splitlines(), start=1):
+        for i, line in enumerate(code, start=1):
             if _CSRF_RE.search(line):
                 lineno = i
                 break
