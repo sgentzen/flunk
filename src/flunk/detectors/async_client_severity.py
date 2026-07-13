@@ -13,7 +13,6 @@ cross-function "called in a loop" analysis is out of scope.
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
 from flunk.detectors._walk import ancestors, build_parent_map
 from flunk.findings import Finding
