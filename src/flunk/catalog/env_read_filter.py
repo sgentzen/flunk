@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import TypeGuard
 
 from flunk.detectors._walk import build_parent_map
 from flunk.findings import Finding
@@ -29,7 +30,7 @@ from flunk.findings import Finding
 RULE_ID = "flunk.pydantic-settings"
 
 
-def _is_env_call(node: ast.AST) -> bool:
+def _is_env_call(node: ast.AST) -> TypeGuard[ast.Call]:
     if not isinstance(node, ast.Call):
         return False
     func = node.func

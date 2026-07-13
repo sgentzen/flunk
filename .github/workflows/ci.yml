@@ -13,94 +13,32 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [20, 22]
+        python-version: ["3.12", "3.13"]
 
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: npm
-
-      - run: npm ci
-
-      - name: Security audit
-        run: npm audit --audit-level=moderate
-
-      - name: Type-check
-        run: npx tsc -p tsconfig.json --noEmit
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test (with coverage)
-        run: npm run test:coverage
-
-      - name: Upload coverage (lcov)
-        if: ${{ matrix.node-version == 22 && !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-lcov
-          path: coverage/lcov.info
-          retention-days: 7
-
-      - name: Build
-        run: npx vite build
-
-  e2e:
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          node-version: 22
-          cache: npm
+          enable-cache: true
 
-      - run: npm ci
+      - name: Sync (all extras + dev group)
+        run: uv sync --all-extras --dev --python ${{ matrix.python-version }}
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+      - name: Lint (ruff)
+        run: uv run ruff check .
 
-      # Playwright's webServer config boots vite (:3000) + the API server (:3001).
-      # CI=true (set by GitHub) enables the 2 retries in playwright.config.ts.
-      - name: Run e2e tests
-        run: npm run test:e2e
+      - name: Type-check (mypy)
+        run: uv run mypy src
 
-      - name: Upload Playwright report
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
+      - name: Test
+        # Catalog/self-audit tests that need the sibling regression projects
+        # (../job-stalker, ../erate-*) skip automatically on a bare checkout —
+        # see tests/conftest.py.
+        run: uv run pytest -q
 
-  sonarcloud:
-    name: SonarCloud
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          # Full history so SonarCloud can assign issues/coverage to the right commits.
-          fetch-depth: 0
-
-      - name: Use Node.js 22
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Coverage
-        run: npm run test:coverage
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v8.2.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
+      - name: CLI smoke test
+        run: uv run flunk --help
