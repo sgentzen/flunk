@@ -115,6 +115,29 @@ Fix (TDD, the same lesson `demote.py` already learned about anchoring to `#`):
   regression guard. Full suite 155 passed; `flunk .` on the repo root is now 0
   findings. semgrep clean on the changed files.
 
+## Demote reads function/class docstrings (2026-07-13)
+
+Extends the Phase-4 "broader justification" work. The justification-demote pass
+([demote.py](src/flunk/demote.py)) previously read only nearby `#` comments and
+the **module** docstring; it now also reads the **enclosing function/class
+docstring** (innermost scope first, then module docstring). A scope-level
+rationale — e.g. `"""We deliberately read env directly rather than settings."""`
+on a helper — now demotes findings inside that scope. Decorator lines are
+included in the scope span. New `_scope_docstrings()` AST helper; 4 new tests in
+[test_demote.py](tests/test_demote.py) (function + class docstrings, no sibling
+leak, plain-docstring no-op, nested fall-through, decorator-line coverage). Full
+suite 161 passed; semgrep/jscpd/ruff/mypy clean on the changed files.
+
+Net effect on the golden set (measured, `--profile unknown`): **1 legitimate
+net-new demotion** — `erate-prospector/db/connection.py:26`, whose
+`get_database_url()` docstring says "or fall back to SQLite" — and **0
+over-demotions**. Note this does **not** demote job-stalker's
+`_apply_inplace_migrations` (the case named in the Weekend-1 "definition of
+done"): that function docstring explains the rationale but uses none of the
+configured marker phrases, so it is deliberately left untouched rather than
+forcing a match by over-fitting the phrase list. Re-pointing that stale example
+in the milestone criteria is tracked separately.
+
 ## v1.5+ backlog (do not start before v1 ships)
 
 - **Pre-flight mode** — hook into Claude Code / Cursor planning output, flag the cut-corner before code is written. Highest-value v2 feature per the codebase-maturity insight in [docs/PRODUCT.md](docs/PRODUCT.md).
