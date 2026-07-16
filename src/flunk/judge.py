@@ -39,6 +39,9 @@ class JudgeItem:
 class Verdict:
     severity: str
     rationale: str
+    # Part of the LLM response schema (forces the judge to commit); a
+    # severity of "skip" is what we actually act on, so this is carried
+    # through the pass but never stored on the Finding.
     worth_doing: bool
 
 
