@@ -94,6 +94,78 @@ def _group_by_rule(findings: list[Finding]) -> dict[str, list[Finding]]:
     return groups
 
 
+def _section_heading(rule_id: str, fs: list[Finding]) -> list[str]:
+    sev = fs[0].severity
+    emoji = SEVERITY_EMOJI.get(sev, "")
+    prefix = f"{emoji} " if emoji else ""
+    occ = "occurrence" if len(fs) == 1 else "occurrences"
+
+    out = ["---", f"## {prefix}{sev.upper()} · {rule_id} · {len(fs)} {occ}"]
+    if sev == "skip":
+        out.append("")
+        out.append("> **Judged not worth doing** — kept here with the judge's reason; no action expected.")
+    out.append("")
+    return out
+
+
+def _why_block(fs: list[Finding], meta: metadata.RuleMeta) -> list[str]:
+    """The judge's code-specific take when it judged this rule, else the catalog's."""
+    judged_rationale = next((f.rationale for f in fs if f.rationale), None)
+    why = judged_rationale or meta.rationale
+    if not why:
+        return []
+    label = "Judge's take" if judged_rationale else "Why it's worse"
+    return [f"**{label}:** {why}", ""]
+
+
+def _fix_block(meta: metadata.RuleMeta) -> list[str]:
+    fix_line = f"**Fix:** {meta.replacement}"
+    if meta.replacement_url:
+        fix_line += f"  → {meta.replacement_url}"
+    out = [fix_line, ""]
+    if meta.fix_hint:
+        hint_lines = meta.fix_hint.splitlines()
+        fence = _fence(hint_lines)
+        out.extend([fence, *hint_lines, fence, ""])
+    return out
+
+
+def _location_block(f: Finding, project_root: Path | None, context: int) -> list[str]:
+    note = "  ← test code; likely lower priority" if _is_test_path(f.file) else ""
+    out = [f"- [ ] {_rel(f.file, project_root)}:{f.line}{note}"]
+    block = _excerpt_block(f.file, f.line, context)
+    if block:
+        block_lines = block.splitlines()
+        fence = _fence(block_lines)
+        out.append(f"  {fence}python")
+        out.extend(f"  {bl}" for bl in block_lines)
+        out.append(f"  {fence}")
+    return out
+
+
+def _rule_section(
+    rule_id: str, fs: list[Finding], project_root: Path | None, context: int
+) -> list[str]:
+    meta = metadata.lookup(rule_id)
+    out = _section_heading(rule_id, fs)
+    out.extend(_why_block(fs, meta))
+    out.extend(_fix_block(meta))
+    out.append("Locations:")
+    for f in fs:
+        out.extend(_location_block(f, project_root, context))
+    out.append("")
+    return out
+
+
+def _summary_line(groups: dict[str, list[Finding]], actionable: int) -> str:
+    rule_word = "rule" if len(groups) == 1 else "rules"
+    finding_word = "finding" if actionable == 1 else "findings"
+    return (
+        f"{actionable} actionable {finding_word} across {len(groups)} {rule_word}. "
+        "Work top-to-bottom; each section is one task."
+    )
+
+
 def build_plan(
     findings: list[Finding],
     *,
@@ -102,67 +174,17 @@ def build_plan(
 ) -> str:
     """Return a grouped-by-rule markdown fix plan for `findings`."""
     groups = _group_by_rule(findings)
-    actionable = sum(len(v) for v in groups.values())
     title = project_root.name if project_root is not None else "project"
 
     out: list[str] = [f"# flunk fix plan — {title}"]
     if not groups:
-        out.append("")
-        out.append("_No actionable findings._")
+        out.extend(["", "_No actionable findings._"])
         return "\n".join(out) + "\n"
 
-    rule_word = "rule" if len(groups) == 1 else "rules"
-    finding_word = "finding" if actionable == 1 else "findings"
-    out.append(
-        f"{actionable} actionable {finding_word} across {len(groups)} {rule_word}. "
-        "Work top-to-bottom; each section is one task."
-    )
+    actionable = sum(len(v) for v in groups.values())
+    out.append(_summary_line(groups, actionable))
     out.append("")
-
     for rule_id, fs in groups.items():
-        meta = metadata.lookup(rule_id)
-        sev = fs[0].severity
-        emoji = SEVERITY_EMOJI.get(sev, "")
-        n = len(fs)
-        occ = "occurrence" if n == 1 else "occurrences"
-
-        out.append("---")
-        prefix = f"{emoji} " if emoji else ""
-        out.append(f"## {prefix}{sev.upper()} · {rule_id} · {n} {occ}")
-        if sev == "skip":
-            out.append("")
-            out.append("> **Judged not worth doing** — kept here with the judge's reason; no action expected.")
-        out.append("")
-        judged_rationale = next((f.rationale for f in fs if f.rationale), None)
-        why = judged_rationale or meta.rationale
-        if why:
-            label = "Judge's take" if judged_rationale else "Why it's worse"
-            out.append(f"**{label}:** {why}")
-            out.append("")
-        fix_line = f"**Fix:** {meta.replacement}"
-        if meta.replacement_url:
-            fix_line += f"  → {meta.replacement_url}"
-        out.append(fix_line)
-        out.append("")
-        if meta.fix_hint:
-            hint_lines = meta.fix_hint.splitlines()
-            fence = _fence(hint_lines)
-            out.append(fence)
-            out.extend(hint_lines)
-            out.append(fence)
-            out.append("")
-
-        out.append("Locations:")
-        for f in fs:
-            note = "  ← test code; likely lower priority" if _is_test_path(f.file) else ""
-            out.append(f"- [ ] {_rel(f.file, project_root)}:{f.line}{note}")
-            block = _excerpt_block(f.file, f.line, context)
-            if block:
-                block_lines = block.splitlines()
-                fence = _fence(block_lines)
-                out.append(f"  {fence}python")
-                out.extend(f"  {bl}" for bl in block_lines)
-                out.append(f"  {fence}")
-        out.append("")
+        out.extend(_rule_section(rule_id, fs, project_root, context))
 
     return "\n".join(out).rstrip() + "\n"

@@ -72,30 +72,35 @@ def _is_type_checking(test: ast.expr) -> bool:
     return False
 
 
+def _is_excluding_scope(anc: ast.AST) -> bool:
+    """True for the two known-good scopes: optional-dep guard, TYPE_CHECKING."""
+    if isinstance(anc, ast.Try):
+        return any(_catches_import_error(h) for h in anc.handlers)
+    if isinstance(anc, ast.If):
+        return _is_type_checking(anc.test)
+    return False
+
+
+def _is_smelly_import(
+    node: ast.Import | ast.ImportFrom, parents: dict[ast.AST, ast.AST], roots: set[str]
+) -> bool:
+    """True if `node` is a first-party import in a function body, unexcluded."""
+    if not _is_first_party(node, roots):
+        return False
+    ancs = list(ancestors(node, parents))
+    in_function = any(isinstance(a, (ast.FunctionDef, ast.AsyncFunctionDef)) for a in ancs)
+    return in_function and not any(_is_excluding_scope(a) for a in ancs)
+
+
 def _inline_first_party_lines(tree: ast.AST, roots: set[str]) -> list[int]:
     """Line numbers of first-party imports nested in a function body."""
     parents = build_parent_map(tree)
-
-    lines: list[int] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.Import, ast.ImportFrom)):
-            continue
-        if not _is_first_party(node, roots):
-            continue
-        in_function = False
-        excluded = False
-        for anc in ancestors(node, parents):
-            if isinstance(anc, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                in_function = True
-            elif isinstance(anc, ast.Try) and any(
-                _catches_import_error(h) for h in anc.handlers
-            ):
-                excluded = True
-            elif isinstance(anc, ast.If) and _is_type_checking(anc.test):
-                excluded = True
-        if in_function and not excluded:
-            lines.append(node.lineno)
-    return sorted(lines)
+    return sorted(
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        and _is_smelly_import(node, parents, roots)
+    )
 
 
 def run(project: Path) -> list[Finding]:
