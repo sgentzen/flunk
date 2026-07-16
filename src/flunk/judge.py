@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Protocol
 
 from flunk.catalog import metadata
-from flunk.findings import SEVERITY_ORDER, Finding
+from flunk.findings import SEVERITY_ORDER, Finding, display_path
 
 CONTEXT_LINES = 6
 _JUDGE_SEVERITIES = frozenset({"high", "medium", "nitpick", "skip"})
@@ -66,15 +66,6 @@ def _excerpt(file: Path, line: int, context: int = CONTEXT_LINES) -> str:
     return "\n".join(out)
 
 
-def _rel(file: Path, root: Path | None) -> str:
-    if root is not None:
-        try:
-            return str(file.relative_to(root)).replace("\\", "/")
-        except ValueError:
-            pass
-    return str(file)
-
-
 def _clamp_security(verdict: Verdict, catalog_severity: str) -> Verdict:
     """Security rules: never lower severity, never skip; rationale may change.
 
@@ -117,7 +108,7 @@ def judge_findings(
             for f in group
         ]
         try:
-            verdicts = client.judge_file(_rel(file, project_root), items)
+            verdicts = client.judge_file(display_path(file, project_root), items)
             judged = []
             for f, verdict in zip(group, verdicts, strict=True):
                 sev = verdict.severity if verdict.severity in _JUDGE_SEVERITIES else f.severity

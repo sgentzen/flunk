@@ -1,4 +1,5 @@
-"""Common Finding schema shared across runners and the demote/rank pipeline."""
+"""Common Finding schema, plus path rendering, shared across runners and the
+demote/rank pipeline."""
 
 from __future__ import annotations
 
@@ -51,3 +52,18 @@ class Finding:
             rationale=rationale,
             judged=True,
         )
+
+
+def display_path(file: Path, root: Path | None) -> str:
+    """Render a finding's path for display: relative to `root`, forward-slashed.
+
+    Separators are normalized so output is identical on Windows and POSIX.
+    Falls back to the absolute path when `root` is None or `file` sits outside
+    it (`relative_to` raises ValueError rather than walking up with `..`).
+    """
+    if root is not None:
+        try:
+            return str(file.relative_to(root)).replace("\\", "/")
+        except ValueError:
+            pass
+    return str(file)

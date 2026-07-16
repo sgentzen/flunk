@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from flunk.catalog import metadata
-from flunk.findings import Finding
+from flunk.findings import Finding, display_path
 
 SEVERITY_EMOJI = {"high": "\U0001f534", "medium": "\U0001f7e1", "nitpick": "⚪"}
 
@@ -68,15 +68,6 @@ def _fence(lines: list[str]) -> str:
             run = run + 1 if ch == "`" else 0
             longest = max(longest, run)
     return "`" * max(3, longest + 1)
-
-
-def _rel(file: Path, root: Path | None) -> str:
-    if root is not None:
-        try:
-            return str(file.relative_to(root)).replace("\\", "/")
-        except ValueError:
-            pass
-    return str(file)
 
 
 def _group_by_rule(findings: list[Finding]) -> dict[str, list[Finding]]:
@@ -132,7 +123,7 @@ def _fix_block(meta: metadata.RuleMeta) -> list[str]:
 
 def _location_block(f: Finding, project_root: Path | None, context: int) -> list[str]:
     note = "  ← test code; likely lower priority" if _is_test_path(f.file) else ""
-    out = [f"- [ ] {_rel(f.file, project_root)}:{f.line}{note}"]
+    out = [f"- [ ] {display_path(f.file, project_root)}:{f.line}{note}"]
     block = _excerpt_block(f.file, f.line, context)
     if block:
         block_lines = block.splitlines()

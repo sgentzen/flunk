@@ -138,6 +138,39 @@ configured marker phrases, so it is deliberately left untouched rather than
 forcing a match by over-fitting the phrase list. Re-pointing that stale example
 in the milestone criteria is tracked separately.
 
+## Shared path renderer — de-duplicated `_rel` (2026-07-16)
+
+`_rel(file, root)` was duplicated byte-for-byte in [agent.py](src/flunk/agent.py)
+and [judge.py](src/flunk/judge.py) — a 53-token jscpd clone, pre-existing as far
+back as cb1c540 and deliberately left out of the SonarQube-cleanup PR to keep
+that diff focused. Extracted to `findings.display_path` in
+[findings.py](src/flunk/findings.py); both modules import it. `src/flunk` is now
+0 jscpd clones (the 2 remaining repo-wide are pre-existing test duplication).
+
+- **Home:** `findings.py`, not a new `_paths.py`. It's the module both callers
+  already import from, it imports nothing else from `flunk` (no circular-import
+  risk), and the helper exists purely to render a `Finding.file`. The
+  `detectors/_source.py` / `_walk.py` "private module, public functions"
+  precedent is detector-scoped; agent/judge aren't detectors, and a module for
+  one 6-line function with two callers is the ceremony this project exists to
+  flag.
+- **Named `display_path`, not `rel_path`:** the underscore had to go (it's now a
+  cross-module import), but `rel_path` is already the established name for the
+  *string* parameter in `judge.py`'s `JudgeClient.judge_file`, `judge_anthropic.py`,
+  and `test_judge.py` — importing it would have shadowed that inside the Protocol's
+  own signature. Harmless today (the body is `...`) but a latent trap; `display_path`
+  also describes the job better.
+- New [tests/test_findings.py](tests/test_findings.py) covers all three branches.
+  The `file`-outside-`root` `ValueError` fallback was previously untested.
+
+**Worktree gotcha worth remembering:** `flunk` is installed via a `flunk.pth`
+pointing at the *main* checkout's `src`, so `pytest` in a worktree silently
+imports main-checkout code and tests your edits not at all. Run
+`PYTHONPATH=<worktree>/src python -m pytest` to shadow it. Likewise
+`tests/conftest.py` resolves the three regression siblings as
+`_REPO_ROOT.parent`, which in a worktree is `.claude/worktrees/` — hence 17
+skips there vs. the full run in the main checkout.
+
 ## v1.5+ backlog (do not start before v1 ships)
 
 - **Pre-flight mode** — hook into Claude Code / Cursor planning output, flag the cut-corner before code is written. Highest-value v2 feature per the codebase-maturity insight in [docs/PRODUCT.md](docs/PRODUCT.md).
