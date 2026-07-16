@@ -115,46 +115,28 @@ Fix (TDD, the same lesson `demote.py` already learned about anchoring to `#`):
   regression guard. Full suite 155 passed; `flunk .` on the repo root is now 0
   findings. semgrep clean on the changed files.
 
-## SonarQube issue cleanup (2026-07-16)
+## Demote reads function/class docstrings (2026-07-13)
 
-Cleared the 8 open issues on the `sgentzen_flunk` SonarCloud project — 5 fixed
-in code, 3 marked false-positive.
+Extends the Phase-4 "broader justification" work. The justification-demote pass
+([demote.py](src/flunk/demote.py)) previously read only nearby `#` comments and
+the **module** docstring; it now also reads the **enclosing function/class
+docstring** (innermost scope first, then module docstring). A scope-level
+rationale — e.g. `"""We deliberately read env directly rather than settings."""`
+on a helper — now demotes findings inside that scope. Decorator lines are
+included in the scope span. New `_scope_docstrings()` AST helper; 4 new tests in
+[test_demote.py](tests/test_demote.py) (function + class docstrings, no sibling
+leak, plain-docstring no-op, nested fall-through, decorator-line coverage). Full
+suite 161 passed; semgrep/jscpd/ruff/mypy clean on the changed files.
 
-- `githubactions:S7637` — pinned `SonarSource/sonarqube-scan-action` to its
-  commit SHA in [sonarcloud.yml](.github/workflows/sonarcloud.yml), matching how
-  `actions/checkout` was already pinned there.
-- `python:S1172` — dropped the unused `worth_doing` param from
-  `Finding.with_judgment`. It was threaded from the LLM response through
-  `Verdict` and then silently ignored; a `skip` severity already encodes it.
-  `Verdict.worth_doing` stays — it's part of the judge's response JSON schema —
-  and now carries a comment saying why it's threaded but never stored. The
-  original "accepted for caller symmetry" note in
-  [the judge plan](docs/superpowers/plans/2026-05-29-llm-judge-pass.md) is left
-  as-is: dated plan docs are historical records, not live API docs.
-- `python:S3776` ×3 — cognitive complexity over the 15 threshold in three
-  functions. All three refactors are behavior-preserving (no test changed):
-  `f811_suppression.run` (19) split into `_inline_hits`/`_config_hits` over a
-  shared `_finding` builder + `_read` helper; `inline_import.
-  _inline_first_party_lines` (17) extracted `_is_smelly_import` /
-  `_is_excluding_scope`, leaving a single comprehension;
-  `agent.build_plan` (29) extracted `_section_heading` / `_why_block` /
-  `_fix_block` / `_location_block` / `_summary_line`.
-- `python:S5886` ×3 (`with_demote`/`with_message`/`with_judgment` "return
-  DataclassInstance, not Finding") — **false positives**, marked as such in
-  SonarCloud. Sonar's bundled stub collapses the TypeVar on
-  `dataclasses.replace` to its `DataclassInstance` bound, so it can't see that
-  `replace(self, ...)` on a `Finding` returns a `Finding`. Not worked around in
-  source: adding `cast()` to appease a stale stub is exactly the noise this tool
-  exists to flag.
-
-Full suite 155 passed (unchanged); `flunk .` on the repo root still 0 findings;
-semgrep clean on the changed files. Known pre-existing duplication not touched
-here: `_rel()` is byte-identical in [agent.py](src/flunk/agent.py) and
-[judge.py](src/flunk/judge.py) (jscpd, 53 tokens) — predates this work, worth a
-shared helper in a follow-up.
-
-Note: the SonarCloud workflow is `workflow_dispatch`-only, so the 5 code fixes
-clear on the dashboard only after a manual scan trigger.
+Net effect on the golden set (measured, `--profile unknown`): **1 legitimate
+net-new demotion** — `erate-prospector/db/connection.py:26`, whose
+`get_database_url()` docstring says "or fall back to SQLite" — and **0
+over-demotions**. Note this does **not** demote job-stalker's
+`_apply_inplace_migrations` (the case named in the Weekend-1 "definition of
+done"): that function docstring explains the rationale but uses none of the
+configured marker phrases, so it is deliberately left untouched rather than
+forcing a match by over-fitting the phrase list. Re-pointing that stale example
+in the milestone criteria is tracked separately.
 
 ## v1.5+ backlog (do not start before v1 ships)
 
