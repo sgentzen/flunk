@@ -39,6 +39,9 @@ class JudgeItem:
 class Verdict:
     severity: str
     rationale: str
+    # Part of the LLM response schema (forces the judge to commit); a
+    # severity of "skip" is what we actually act on, so this is carried
+    # through the pass but never stored on the Finding.
     worth_doing: bool
 
 
@@ -121,9 +124,7 @@ def judge_findings(
                 v = Verdict(sev, verdict.rationale, verdict.worth_doing)
                 if metadata.is_security_rule(f.rule_id):
                     v = _clamp_security(v, f.severity)
-                judged.append((f, f.with_judgment(
-                    severity=v.severity, rationale=v.rationale, worth_doing=v.worth_doing
-                )))
+                judged.append((f, f.with_judgment(severity=v.severity, rationale=v.rationale)))
         except Exception:
             # One file failing (LLM error, malformed/mismatched response) must not
             # sink the whole pass — leave this file's findings unjudged and move on.

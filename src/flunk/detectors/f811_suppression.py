@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from flunk.catalog.metadata import lookup
+from flunk.catalog.metadata import RuleMeta, lookup
 from flunk.detectors._source import iter_comments
 from flunk.detectors._walk import walk_py
 from flunk.findings import Finding
@@ -26,64 +26,78 @@ RULE_ID = "flunk.f811-suppression"
 _F811_RE = re.compile(r"^#\s*noqa\s*:.*\bF811\b", re.IGNORECASE)
 
 
-def run(project: Path) -> list[Finding]:
-    meta = lookup(RULE_ID)
+_INLINE_MESSAGE = (
+    "F811 suppression — function redefinition is silenced. Almost always "
+    "means a duplicate def should be deleted, not suppressed."
+)
+_CONFIG_MESSAGE = (
+    "F811 in ruff per-file-ignores — silences function redefinitions for a "
+    "whole file. Delete the duplicate def instead of suppressing."
+)
+
+
+def _read(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def _finding(meta: RuleMeta, file: Path, line: int, message: str) -> Finding:
+    return Finding(
+        rule_id=RULE_ID,
+        category=meta.category,
+        severity=meta.severity,
+        file=file,
+        line=line,
+        message=message,
+        replacement=meta.replacement,
+        replacement_url=meta.replacement_url,
+    )
+
+
+def _inline_hits(project: Path, meta: RuleMeta) -> list[Finding]:
+    """Inline `# noqa: F811` directives in the project's Python source."""
     out: list[Finding] = []
-
-    # Inline `# noqa: F811`
     for path in walk_py(project):
-        try:
-            source = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+        source = _read(path)
+        if source is None:
             continue
-        for lineno, comment in iter_comments(source):
-            if _F811_RE.search(comment):
-                out.append(
-                    Finding(
-                        rule_id=RULE_ID,
-                        category=meta.category,
-                        severity=meta.severity,
-                        file=path,
-                        line=lineno,
-                        message=(
-                            "F811 suppression — function redefinition is "
-                            "silenced. Almost always means a duplicate def "
-                            "should be deleted, not suppressed."
-                        ),
-                        replacement=meta.replacement,
-                        replacement_url=meta.replacement_url,
-                    )
-                )
+        out.extend(
+            _finding(meta, path, lineno, _INLINE_MESSAGE)
+            for lineno, comment in iter_comments(source)
+            if _F811_RE.search(comment)
+        )
+    return out
 
-    # Per-file-ignores in pyproject.toml / ruff.toml
+
+def _lists_f811_per_file(line: str) -> bool:
+    """Crude but works: any config line that lists F811 in a per-file-ignore.
+
+    Most ruff configs put F811 in a list under per-file-ignores rather than the
+    top-level `ignore = [...]`. Skip the latter since that's a global blanket
+    suppression with different semantics.
+    """
+    return "F811" in line and "ignore" not in line.lower()
+
+
+def _config_hits(project: Path, meta: RuleMeta) -> list[Finding]:
+    """Per-file-ignores in pyproject.toml / ruff.toml."""
+    out: list[Finding] = []
     for cfg in (project / "pyproject.toml", project / "ruff.toml", project / ".ruff.toml"):
         if not cfg.is_file():
             continue
-        try:
-            text = cfg.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+        text = _read(cfg)
+        if text is None:
             continue
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            # crude but works: any line that lists F811 in a per-file-ignore.
-            if "F811" in line and "ignore" not in line.lower():
-                # most ruff configs put F811 in a list under per-file-ignores
-                # rather than the top-level `ignore = [...]`. Skip the latter
-                # since that's a global blanket suppression with different
-                # semantics.
-                out.append(
-                    Finding(
-                        rule_id=RULE_ID,
-                        category=meta.category,
-                        severity=meta.severity,
-                        file=cfg,
-                        line=lineno,
-                        message=(
-                            "F811 in ruff per-file-ignores — silences function "
-                            "redefinitions for a whole file. Delete the "
-                            "duplicate def instead of suppressing."
-                        ),
-                        replacement=meta.replacement,
-                        replacement_url=meta.replacement_url,
-                    )
-                )
+        out.extend(
+            _finding(meta, cfg, lineno, _CONFIG_MESSAGE)
+            for lineno, line in enumerate(text.splitlines(), start=1)
+            if _lists_f811_per_file(line)
+        )
     return out
+
+
+def run(project: Path) -> list[Finding]:
+    meta = lookup(RULE_ID)
+    return _inline_hits(project, meta) + _config_hits(project, meta)

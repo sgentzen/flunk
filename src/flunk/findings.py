@@ -41,9 +41,9 @@ class Finding:
     def with_message(self, new_message: str) -> Finding:
         return replace(self, message=new_message)
 
-    def with_judgment(
-        self, *, severity: str, rationale: str, worth_doing: bool
-    ) -> Finding:
+    def with_judgment(self, *, severity: str, rationale: str) -> Finding:
+        # A `skip` severity already encodes the judge's "not worth doing", so the
+        # verdict's worth_doing flag is deliberately not stored separately.
         return replace(
             self,
             severity=severity,

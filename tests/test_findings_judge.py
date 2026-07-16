@@ -16,7 +16,7 @@ def test_with_judgment_sets_fields() -> None:
         rule_id="flunk.async-client-in-fn", category="anti-pattern",
         severity="high", file=Path("a.py"), line=1, message="m",
     )
-    j = f.with_judgment(severity="medium", rationale="one-shot here", worth_doing=True)
+    j = f.with_judgment(severity="medium", rationale="one-shot here")
     assert j.severity == "medium"
     assert j.rationale == "one-shot here"
     assert j.judged is True
