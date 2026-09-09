@@ -64,6 +64,3 @@ jobs:
         # (../job-stalker, ../erate-*) skip automatically on a bare checkout --
         # see tests/conftest.py.
         run: uv run --no-build --no-sync pytest -q
-
-      - name: CLI smoke test
-        run: uv run --no-build --no-sync flunk --help

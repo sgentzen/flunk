@@ -212,6 +212,19 @@ vulnerabilities were in [ci.yml](.github/workflows/ci.yml)).
   matches the exact `"(lines 2, 5, 7)"` substring rather than `"2" in message`,
   which any incidental digit satisfied.
 
+**Entry-point coverage gap closed.** Removing CI's `flunk --help` smoke step
+left `[project.scripts] flunk = "flunk:main"` with zero coverage —
+[test_cli_judge.py](tests/test_cli_judge.py) drives the CLI through Typer's
+`CliRunner`, which imports `flunk.cli.app` from source and never runs the
+installed console script, so a broken entry-point string would have shipped
+undetected. New [test_cli_entrypoint.py](tests/test_cli_entrypoint.py) covers
+the declaration, that it loads and is callable, and that the installed
+executable launches as a subprocess. That last test looks in the interpreter's
+own script dir via `sysconfig` and *fails* rather than skips when the script is
+absent: an earlier draft skipped on a bare `shutil.which("flunk")` miss, which
+meant it silently no-opped under `make test` (a non-activated shell has the
+venv's script dir off PATH) and only ever really ran in CI.
+
 **Note:** [sonarcloud.yml](.github/workflows/sonarcloud.yml) is
 `workflow_dispatch` only, so these issues do not clear on push — the scan has to
 be triggered manually.
