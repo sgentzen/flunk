@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-09
+
+### Added
+
+- The justification-demote pass now reads the **enclosing function or class
+  docstring**, not just nearby `#` comments and the module docstring. A
+  rationale written on a helper -- "We deliberately read env directly rather
+  than going through settings" -- now demotes findings inside that scope.
+  Innermost scope wins, falling back to the module docstring; decorator lines
+  count as part of the scope ([#8]).
+- `tests/test_cli_entrypoint.py` covers the `flunk` console script end to end:
+  that it is declared, that its target loads and is callable, and that the
+  installed executable actually launches. Previously nothing exercised the
+  `[project.scripts]` wiring, so a broken entry point could ship undetected
+  ([#13]).
+
+### Fixed
+
+- `flunk` no longer reports a false `duplicate-code` style clone between
+  `agent.py` and `judge.py`. The byte-for-byte duplicated `_rel()` helper was
+  extracted to `findings.display_path`, taking `src/flunk` to zero jscpd
+  clones ([#11]).
+
+### Changed
+
+- **CI installs dependencies wheels-only.** The `uv sync` step is split in two:
+  third-party dependencies install under `--no-build`, so no dependency's build
+  backend executes during a CI run, followed by a plain sync for flunk's own
+  editable install (which has no wheel and must be built). Note this is
+  defence-in-depth rather than containment -- CI then runs `pytest`, which
+  imports those packages, so `--no-build` narrows the window from install-time
+  to import-time ([#13]).
+- **CI fails on a stale lockfile.** `uv sync` now passes `--locked`, so a
+  `pyproject.toml` change without a regenerated `uv.lock` breaks the build
+  instead of silently installing the previous dependency set ([#13]).
+- Cleared all outstanding SonarCloud issues; the quality gate is green
+  ([#10], [#13]).
+
 ## [0.1.1] — 2026-06-19
 
 ### Fixed
@@ -75,7 +113,12 @@ ranks by severity, prints a `rich` table.
   (`security|auth|crypto|csrf|jwt|token`) — a bare except in
   `services/cleanup.py` isn't the smell; one in `auth/jwt.py` is.
 
-[unreleased]: https://github.com/sgentzen/flunk/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/sgentzen/flunk/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/sgentzen/flunk/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/sgentzen/flunk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/sgentzen/flunk/releases/tag/v0.1.0
 [#7]: https://github.com/sgentzen/flunk/pull/7
+[#8]: https://github.com/sgentzen/flunk/pull/8
+[#10]: https://github.com/sgentzen/flunk/pull/10
+[#11]: https://github.com/sgentzen/flunk/pull/11
+[#13]: https://github.com/sgentzen/flunk/pull/13
