@@ -171,6 +171,51 @@ imports main-checkout code and tests your edits not at all. Run
 `_REPO_ROOT.parent`, which in a worktree is `.claude/worktrees/` — hence 17
 skips there vs. the full run in the main checkout.
 
+## SonarCloud cleanup + CI supply-chain hardening (2026-09-09)
+
+Cleared all 7 open SonarCloud issues on `sgentzen_flunk` (quality gate was
+failing on `new_vulnerabilities_severity`, 15 vs a threshold of 9 — all four
+vulnerabilities were in [ci.yml](.github/workflows/ci.yml)).
+
+- **`githubactions:S8544`** (unlocked dependency resolution): `uv sync` now
+  passes `--locked`. Chose `--locked` over the rule's own `--frozen` example
+  because the two differ where it counts: with a dependency added to
+  `pyproject.toml` but no regenerated lock, `--frozen` exits 0 and silently
+  installs the stale set, while `--locked` fails with "lockfile needs to be
+  updated". Measured, not assumed. Risk accepted: it is unconfirmed whether
+  Sonar's matcher recognises `--locked`, so S8544 may re-raise — a one-token
+  revert if so.
+- **`githubactions:S8541` x3**: `--no-build` added to the three
+  `uv run --no-sync` steps. These are **inert** — `--no-sync` installs nothing,
+  so no build phase exists to constrain (confirmed via `uv run -v`, which logs
+  only "Skipping environment synchronization"). Kept anyway: they are what the
+  rule asks for, and they become a real guard if `--no-sync` is ever dropped.
+- **Real fix for the same hazard — two-step sync.** The step that actually
+  builds is `uv sync`, and `--no-build` can't go on it: uv 0.11.16 refuses the
+  first-party editable `flunk`, which has no wheel (`can't be installed because
+  it is marked as --no-build but has no binary distribution`). Split into
+  `--no-install-project --no-build` (third-party, wheels only) then a plain sync
+  (first-party build only). Verified from a clean venv: step 1 installs 35 deps,
+  step 2 reports `Installed 1 package + flunk`, `flunk --help` works after.
+  Today's exposure was already nil — all 35 locked deps ship wheels — but
+  nothing pinned that; step 1 now fails the day one goes sdist-only, unless
+  setup-uv's cache still holds a wheel built for it by an earlier run.
+  Caveat: this is defence-in-depth, not containment. CI runs `pytest`, which
+  imports these packages, so a compromised dependency still gets execution at
+  import time; `--no-build` only narrows install-time to import-time.
+- **`python:S9073` x3**: composite `assert a and b` split one per condition in
+  [test_inline_import.py](tests/test_inline_import.py) and
+  [test_jscpd.py](tests/test_jscpd.py). Review then found both sites were
+  asserting bare membership, so they were strengthened past what the rule asked:
+  jscpd now checks each flag against its paired value via the
+  `cmd[cmd.index(flag) + 1]` idiom already used in that file, and inline-import
+  matches the exact `"(lines 2, 5, 7)"` substring rather than `"2" in message`,
+  which any incidental digit satisfied.
+
+**Note:** [sonarcloud.yml](.github/workflows/sonarcloud.yml) is
+`workflow_dispatch` only, so these issues do not clear on push — the scan has to
+be triggered manually.
+
 ## v1.5+ backlog (do not start before v1 ships)
 
 - **Pre-flight mode** — hook into Claude Code / Cursor planning output, flag the cut-corner before code is written. Highest-value v2 feature per the codebase-maturity insight in [docs/PRODUCT.md](docs/PRODUCT.md).

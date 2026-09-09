@@ -25,24 +25,45 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Sync (all extras + dev group)
-        run: uv sync --all-extras --dev --python ${{ matrix.python-version }}
+      # Split in two so third-party dependencies install wheels-only: no
+      # *locked* dependency's build backend gets to execute code in CI.
+      # `--no-build` can't cover the second step because the first-party
+      # editable install of flunk itself has no wheel and must be built.
+      # One accepted exception: that build resolves `uv_build` (pyproject's
+      # build-system requires), which is not in uv.lock and so is covered by
+      # neither --locked nor step 1.
+      #
+      # Step 1 is fail-closed by ordering: step 2 resolves the same set minus
+      # the project, so a dependency going sdist-only breaks step 1 first --
+      # unless setup-uv's cache still holds a wheel it built earlier.
+      - name: Sync dependencies (wheels only, no build scripts)
+        run: uv sync --locked --all-extras --dev --no-install-project --no-build --python ${{ matrix.python-version }}
 
-      # `uv run --no-sync` reuses the environment built by the sync step above.
+      - name: Install project (first-party build only)
+        run: uv sync --locked --all-extras --dev --python ${{ matrix.python-version }}
+
+      # `--no-build` on these steps is inert: `--no-sync` installs nothing, so
+      # there is never a package to refuse. It is kept because Sonar
+      # githubactions:S8541 flags a bare `uv run`, and because it would become a
+      # real guard if `--no-sync` were ever dropped. Do NOT add it to the second
+      # sync step above -- uv then refuses to build the first-party editable
+      # `flunk` package and CI fails on both matrix legs.
+      #
+      # `uv run --no-sync` reuses the environment built by the sync steps above.
       # Without it, a bare `uv run` re-infers Python from requires-python (>=3.12),
-      # recreates the venv as 3.12 without the extras, and drops `anthropic` —
+      # recreates the venv as 3.12 without the extras, and drops `anthropic` --
       # breaking the 3.13 job's mypy/tests.
       - name: Lint (ruff)
-        run: uv run --no-sync ruff check .
+        run: uv run --no-build --no-sync ruff check .
 
       - name: Type-check (mypy)
-        run: uv run --no-sync mypy src
+        run: uv run --no-build --no-sync mypy src
 
       - name: Test
         # Catalog/self-audit tests that need the sibling regression projects
-        # (../job-stalker, ../erate-*) skip automatically on a bare checkout —
+        # (../job-stalker, ../erate-*) skip automatically on a bare checkout --
         # see tests/conftest.py.
-        run: uv run --no-sync pytest -q
+        run: uv run --no-build --no-sync pytest -q
 
       - name: CLI smoke test
-        run: uv run --no-sync flunk --help
+        run: uv run --no-build --no-sync flunk --help
