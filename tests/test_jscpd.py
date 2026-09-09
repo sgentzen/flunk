@@ -25,8 +25,12 @@ def test_build_cmd_carries_core_flags() -> None:
         ["npx", "--yes", "jscpd"], Path("/proj"), Path("/out"), min_tokens=42
     )
     assert cmd[:3] == ["npx", "--yes", "jscpd"]
-    assert "--min-tokens" in cmd and "42" in cmd
-    assert "--reporters" in cmd and "json" in cmd
+    # Adjacency matters: a bare `in` check passes if "42" or "json" turns up
+    # as an unrelated argument rather than as this flag's value.
+    assert "--min-tokens" in cmd
+    assert cmd[cmd.index("--min-tokens") + 1] == "42"
+    assert "--reporters" in cmd
+    assert cmd[cmd.index("--reporters") + 1] == "json"
 
 
 def test_build_cmd_passes_project_as_posix_path() -> None:

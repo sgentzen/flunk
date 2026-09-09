@@ -38,7 +38,9 @@ def test_fires_on_three_first_party_inline_imports(tmp_path: Path) -> None:
     f = findings[0]
     assert f.rule_id == RULE_ID
     # All occurrence lines are reported so every redundant import is actionable.
-    assert "2" in f.message and "5" in f.message and "7" in f.message
+    # Matched as one substring: bare `"2" in f.message` also passes on any
+    # incidental digit, so it would survive losing the line list entirely.
+    assert "(lines 2, 5, 7)" in f.message
 
 
 def test_third_party_inline_imports_are_ignored(tmp_path: Path) -> None:
