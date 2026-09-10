@@ -19,6 +19,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes to git, so don't leave the job's token
+          # readable by the third-party actions that run after this step.
+          persist-credentials: false
 
       # `auto` (setup-uv v10+) disables the cache on non-github-hosted
       # runners and for tag pushes, pull_request_target, workflow_run and
