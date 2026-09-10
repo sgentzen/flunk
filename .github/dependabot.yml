@@ -1,0 +1,44 @@
+# Keeps the SHA-pinned GitHub Actions in .github/workflows current.
+#
+# Without this, pins drift silently: actions/checkout sat on v4.3.1 until a
+# Node 20 deprecation annotation forced the bump, by which point setup-uv was
+# two majors behind. Dependabot rewrites both the SHA and the trailing
+# "# vX.Y.Z" comment, so the repo's pinning convention survives untouched.
+#
+# Actions only, deliberately. Python dependency *vulnerabilities* are covered
+# by Dependabot alerts and security updates, both enabled on the repository.
+# Note this is not what `uv sync --locked` gives you: that proves the lock is
+# consistent with pyproject.toml and says nothing about known CVEs in the
+# pinned versions. Add a `uv` ecosystem entry here if routine version bumps
+# (as opposed to advisories) are ever wanted too.
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    # "/" is correct even though the workflows live in .github/workflows --
+    # for this ecosystem the directory is the repo root, not the workflow
+    # dir. It covers .github/workflows plus a root action.yml, but NOT
+    # composite actions under .github/actions/*/action.yml. None exist
+    # here today; add a second entry if one ever does.
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Wait a week before proposing a newly published version, so a
+    # compromised or yanked release has time to surface rather than being
+    # opened as a PR the day it lands. github-actions supports only
+    # default-days; the semver-* variants are not available for it
+    # (dependabot-core#14628). This gates *version* updates only --
+    # security updates from an advisory bypass the cooldown entirely,
+    # which is the behaviour you want for a GHSA.
+    cooldown:
+      default-days: 7
+    # One PR for all action updates rather than one per action. With three
+    # actions in two workflows, separate PRs would be more review overhead
+    # than signal.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    # Matches the repo's Conventional Commits style ("ci: bump ...").
+    commit-message:
+      prefix: "ci"
