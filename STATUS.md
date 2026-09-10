@@ -225,9 +225,12 @@ absent: an earlier draft skipped on a bare `shutil.which("flunk")` miss, which
 meant it silently no-opped under `make test` (a non-activated shell has the
 venv's script dir off PATH) and only ever really ran in CI.
 
-**Note:** [sonarcloud.yml](.github/workflows/sonarcloud.yml) is
-`workflow_dispatch` only, so these issues do not clear on push — the scan has to
-be triggered manually.
+**Note:** SonarCloud analysis runs server-side (automatic analysis via the
+GitHub App), not from a workflow in this repo. Results appear on PRs and on
+main without any pipeline step. The old `sonarcloud.yml` that ran the scanner
+CLI manually was deleted 2026-09-10: it had never succeeded once (missing
+`sonar.projectKey`/`sonar.organization` in July, then a 403 from an expired
+SONAR_TOKEN), and it duplicated analysis that already happens automatically.
 
 ## v1.5+ backlog (do not start before v1 ships)
 
