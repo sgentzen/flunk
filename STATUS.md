@@ -245,6 +245,10 @@ SONAR_TOKEN), and it duplicated analysis that already happens automatically.
 
 That a `semgrep + curated catalog + demote pass` achieves high enough signal-to-noise to be trusted by a senior engineer running it daily. The 3-project audit said yes (~87% PATTERN+HYBRID); the proof is whether you keep running it without losing trust after a month of real use.
 
+## Maintenance
+
+- 2026-09-22: `make test` no longer wraps pytest in the retired machine-wide test-slot wrapper.
+
 ## Provenance
 
 This project's product thinking, name, scope, and catalog seed were developed in a brainstorming session on 2026-05-26. The audit experiment that validated the hypothesis ran against `job-stalker`, `erate-filing-assistant`, and `erate-prospector` — all three are sibling projects.
